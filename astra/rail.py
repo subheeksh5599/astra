@@ -133,3 +133,50 @@ class Rail:
         verdict["http"] = status
         return verdict
 
+    # -- the pass ---------------------------------------------------------
+    def run(self, request: dict, max_wait: int = 0, interval: int = 15, on_wait=None) -> dict:
+        started = time.time()
+        observed = self.observe(request, max_wait=max_wait, interval=interval, on_wait=on_wait)
+        destination_domain = request["destination_domain"]
+
+        observed["transmitter_check"] = self.verify_transmitter(destination_domain)
+        preflight = None
+        if observed["attestation"].get("state") == "final" and observed.get("message"):
+            observed["destination_record"] = self.destination_record(destination_domain,
+                                                                     observed["message"])
+            preflight = self.preflight(destination_domain, observed["attestation"])
+        observed["preflight"] = preflight
+
+        decision = classifier.decide(request, observed)
+
+        execution = None
+        if decision["action"] == classifier.COMPLETE:
+            message = observed["message"]
+            execution = self.kh.execute(
+                CHAIN_IDS[destination_domain], transmitter(self.env, destination_domain),
+                "receiveMessage", RECEIVE_ABI,
+                [observed["attestation"]["message"], observed["attestation"]["attestation"]],
+                idem=f"astra-{message['source_domain']}-{message['nonce'][-12:]}")
+
+        receipt = {
+            "transfer_id": protocol.transfer_id(observed["message"]) if observed.get("message")
+            else f"{request['source_domain']}:{request['burn_tx']}",
+            "request": request,
+            "observed": {
+                "attestation_state": observed["attestation"].get("state"),
+                "attestation_status": observed["attestation"].get("status"),
+                "message": observed.get("message"),
+                "message_error": observed.get("message_error"),
+                "transmitter_check": observed["transmitter_check"],
+                "preflight": preflight,
+                "destination_record": observed.get("destination_record"),
+                "executing_wallet": observed.get("executing_wallet"),
+            },
+            "decision": decision,
+            "execution": execution,
+            "transaction_hash": self.kh.transaction_hash(execution) if execution else None,
+            "transaction_link": self.kh.transaction_link(execution) if execution else None,
+            "seconds": round(time.time() - started, 1),
+        }
+        return receipt
+
