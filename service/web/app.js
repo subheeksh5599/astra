@@ -355,6 +355,39 @@ function bindApp() {
   el("btn-wallet-open").addEventListener("click", openTransfer);
   el("filter-blocks").addEventListener("change", refresh);
   el("btn-invariant").addEventListener("click", () => loadInvariant(true));
+  document.querySelectorAll(".rail-item[data-pane]").forEach((item) => {
+    item.addEventListener("click", (event) => {
+      event.preventDefault();
+      showPane(item.dataset.pane);
+      history.replaceState(null, "", `#${item.dataset.pane}`);
+    });
+  });
+  window.addEventListener("hashchange", () => showPane(paneFromHash()));
+  showPane(paneFromHash());
+}
+
+/* The dashboard is one pane at a time, chosen from the rail. Everything is loaded
+   regardless of which pane is on screen, so switching never means waiting. */
+function paneFromHash() {
+  const name = (location.hash || "").replace("#", "");
+  return document.querySelector(`.pane-body[data-pane="${name}"]`) ? name : "transfers";
+}
+
+function showPane(name) {
+  document.querySelectorAll(".pane-body").forEach((pane) => {
+    pane.classList.toggle("hidden", pane.dataset.pane !== name);
+  });
+  document.querySelectorAll(".rail-item[data-pane]").forEach((item) => {
+    const active = item.dataset.pane === name;
+    item.classList.toggle("active", active);
+    if (active) { item.setAttribute("aria-current", "page"); } else { item.removeAttribute("aria-current"); }
+  });
+  if (name === "invariant" || name === "passes") {
+    const summary = el("inv-summary");
+    if (summary && summary.textContent.trim() === "not run yet") loadInvariant(false);
+  }
+  if (name === "burn") loadPayer();
+  if (name === "receipts") loadLedger();
 }
 
 function showError(message) {
@@ -399,6 +432,7 @@ function renderRows(rows) {
     if (row.decision && counts[row.decision.action] !== undefined) counts[row.decision.action] += 1;
   });
   text(el("c-inflight"), String(rows.length));
+  text(el("rail-c-inflight"), String(rows.length));
   text(el("c-ready"), String(counts.complete));
   text(el("c-waiting"), String(counts.defer));
   text(el("c-refused"), String(counts.refuse));
@@ -493,6 +527,7 @@ async function loadLedger() {
   try {
     const body = await jget("/api/receipts");
     const receipts = body.receipts || [];
+    text(el("rail-c-receipts"), String(receipts.length));
     tbody.innerHTML = receipts.length ? receipts.map((r) => `
       <tr>
         <td><span class="mono">${short(r.transfer_id, 12, 6)}</span></td>
@@ -500,7 +535,7 @@ async function loadLedger() {
         <td>${r.transaction_link
           ? `<a href="${r.transaction_link}" target="_blank" rel="noreferrer" class="mono">${short(r.transaction_hash, 12, 6)}</a>`
           : `<span class="dim">no money moved</span>`}</td>
-      </tr>`).join("") : `<tr><td colspan="3" class="dim">No decisions recorded yet.</td></tr>`;
+      </tr>`).join("") : `<tr><td colspan="3" class="dim">No receipts yet.</td></tr>`;
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="3" class="dim">receipts unavailable: ${err.message}</td></tr>`;
   }
@@ -516,8 +551,8 @@ function offlineBanner(err) {
     chains through it, so nothing can be shown until it is up.<br>
     <span class="mono">.venv/bin/python service/astra_service.py --port 8099</span><br>
     <span class="dim">then open http://127.0.0.1:8099/app — ${err.message}</span>`;
-  const main = document.querySelector(".wrap");
-  if (main) main.parentNode.insertBefore(banner, main);
+  const host = document.querySelector(".dash") || document.querySelector(".wrap");
+  if (host) host.parentNode.insertBefore(banner, host);
 }
 
 /* --- the invariant ---------------------------------------------------- */
@@ -545,6 +580,7 @@ function renderInvariant(out) {
   const counts = { paired: 0, stranded: 0, "in flight": 0, unwatched: 0, unknown: 0 };
   (out.rows || []).forEach((row) => { counts[row.verdict] = (counts[row.verdict] || 0) + 1; });
   text(el("i-paired"), String(counts.paired || 0));
+  text(el("rail-c-paired"), String(counts.paired || 0));
   text(el("i-stranded"), String(counts.stranded || 0));
   text(el("i-inflight"), String(counts["in flight"] || 0));
   text(el("i-unwatched"), String(counts.unwatched || 0));

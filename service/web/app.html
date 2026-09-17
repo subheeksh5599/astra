@@ -6,106 +6,64 @@
 <title>ASTRA: control surface</title>
 <link rel="stylesheet" href="astra.css">
 </head>
-<body>
+<body class="dash-body">
 
-<nav class="nav">
-  <div class="wrap nav-in">
+<header class="topbar">
+  <div class="topbar-in">
     <span class="crumb">Control surface</span>
-    <div class="nav-links">
-      <a href="#collection">Transfers</a>
-      <a href="#invariant">Invariant</a>
-      <a href="#ledger">Receipts</a>
-    </div>
     <span class="spacer"></span>
     <span class="chip"><span class="dot on"></span><span id="chip-mode">execution layer</span></span>
+    <span class="note" id="cfg-line">reading configuration</span>
     <button class="btn outline sm" id="btn-refresh">Rescan</button>
   </div>
-</nav>
+</header>
 
 <div class="err hidden" id="err"></div>
 
-<div class="wrap">
-<div class="shell">
+<div class="dash">
 
-  <aside class="side">
+  <aside class="rail">
+    <nav class="rail-nav" id="rail-nav">
+      <div class="rail-group">Operations</div>
+      <a class="rail-item" href="#transfers" data-pane="transfers"><span class="n" id="rail-c-inflight">&middot;</span>Transfers</a>
+      <a class="rail-item" href="#invariant" data-pane="invariant"><span class="n" id="rail-c-paired">&middot;</span>Invariant</a>
+      <a class="rail-item" href="#passes" data-pane="passes">Passes</a>
+      <a class="rail-item" href="#receipts" data-pane="receipts"><span class="n" id="rail-c-receipts">&middot;</span>Receipts</a>
 
-    <div class="side-block">
-      <div class="eyebrow">Payer</div>
-      <div class="payer-box" id="payer-box">reading&hellip;</div>
+      <div class="rail-group">Payer</div>
+      <a class="rail-item" href="#burn" data-pane="burn">Burn</a>
+      <a class="rail-item" href="#wallet" data-pane="wallet">Wallet</a>
 
-      <div class="field">
-        <label for="payer-source">Source chain</label>
-        <select id="payer-source"></select>
-      </div>
-      <div class="field">
-        <label for="payer-amount">Amount (USDC)</label>
-        <input id="payer-amount" value="0.5" inputmode="decimal">
-      </div>
-      <div class="field">
-        <label for="payer-destination">Destination chain</label>
-        <select id="payer-destination"></select>
-      </div>
-      <div class="field">
-        <label for="payer-caller">Caller</label>
-        <input id="payer-caller" placeholder="optional">
-      </div>
-
-      <div class="row">
-        <button class="btn primary" id="btn-open">Burn it</button>
-        <button class="btn outline" id="btn-open-finish">Burn and finish</button>
-      </div>
-      <p class="note" id="open-state" style="margin-top:12px">nothing sent yet</p>
-      <ol class="steps hidden" id="open-steps"></ol>
-      <div class="row" style="margin-top:8px">
-        <a class="btn outline sm hidden" id="open-link" target="_blank" rel="noreferrer">Burn</a>
-        <a class="btn outline sm hidden" id="mint-link" target="_blank" rel="noreferrer">Mint</a>
-        <a class="btn outline sm hidden" id="faucet" target="_blank" rel="noreferrer">Faucet</a>
-      </div>
-    </div>
-
-    <div class="side-block">
-      <div class="eyebrow">Wallet</div>
-      <div class="row" style="margin-bottom:12px">
-        <button class="btn outline sm" id="btn-connect">Connect</button>
-        <span class="dim" id="wallet-state" style="font-size:13px">not connected</span>
-      </div>
-      <button class="btn outline" id="btn-wallet-open" disabled>Approve and burn</button>
-    </div>
-
-    <div class="side-block">
-      <div class="eyebrow">Window</div>
-      <div class="field">
-        <label for="filter-blocks">Read back</label>
-        <select id="filter-blocks">
+      <div class="rail-group">Window</div>
+      <div class="rail-control">
+        <select id="filter-blocks" aria-label="how far back to read">
           <option value="3600" selected>1 hour</option>
           <option value="18000">5 hours</option>
           <option value="86400">1 day</option>
         </select>
+        <span class="note">the same span on every chain</span>
       </div>
-      <p class="note" id="cfg-line">reading configuration</p>
-    </div>
-
+    </nav>
   </aside>
 
-  <main class="main">
+  <main class="pane">
 
-    <section id="collection">
-      <div class="eyebrow">Transfers in flight</div>
+    <section class="pane-body" data-pane="transfers" id="transfers">
+      <div class="pane-head">
+        <h1>Transfers in flight</h1>
+        <span class="note" id="last-scan">not scanned yet</span>
+      </div>
       <div class="counters">
         <div><div class="v" id="c-inflight">&middot;</div><div class="k">in flight</div></div>
         <div><div class="v" id="c-ready">&middot;</div><div class="k">deliverable</div></div>
         <div><div class="v" id="c-waiting">&middot;</div><div class="k">waiting</div></div>
         <div><div class="v" id="c-refused">&middot;</div><div class="k">refused</div></div>
       </div>
-      <div class="row" style="justify-content:space-between;margin-bottom:16px">
-        <div class="states">
-          <span><i class="ok"></i>deliverable</span>
-          <span><i class="no"></i>refused</span>
-          <span><i class="wait"></i>waiting</span>
-        </div>
-        <span class="note" id="last-scan">not scanned yet</span>
+      <div class="states">
+        <span><i class="ok"></i>deliverable</span>
+        <span><i class="no"></i>refused</span>
+        <span><i class="wait"></i>waiting</span>
       </div>
-
       <table>
         <thead>
           <tr>
@@ -119,21 +77,22 @@
         </thead>
         <tbody id="rows"><tr><td colspan="6" class="skel"></td></tr></tbody>
       </table>
-
       <div id="receipt" class="hidden" style="margin-top:24px"></div>
     </section>
 
-    <section id="invariant">
-      <div class="eyebrow">Invariant</div>
+    <section class="pane-body hidden" data-pane="invariant" id="invariant">
+      <div class="pane-head">
+        <h1>Invariant</h1>
+        <span class="note" id="inv-summary">not run yet</span>
+      </div>
       <div class="counters">
         <div><div class="v" id="i-paired">&middot;</div><div class="k">paired</div></div>
         <div><div class="v" id="i-stranded">&middot;</div><div class="k">stranded</div></div>
         <div><div class="v" id="i-inflight">&middot;</div><div class="k">in flight</div></div>
         <div><div class="v" id="i-unwatched">&middot;</div><div class="k">unwatched</div></div>
       </div>
-      <div class="row" style="justify-content:space-between;margin-bottom:16px">
+      <div class="row" style="margin-bottom:16px">
         <button class="btn outline sm" id="btn-invariant">Run</button>
-        <span class="note" id="inv-summary">not run yet</span>
       </div>
       <div id="inv-broken"></div>
       <table>
@@ -141,17 +100,25 @@
           <th style="width:120px">Attestation</th><th style="width:130px">Verdict</th><th>Value</th></tr></thead>
         <tbody id="inv-rows"><tr><td colspan="5" class="dim">run it to read the window</td></tr></tbody>
       </table>
+    </section>
 
-      <div class="eyebrow" style="margin-top:40px">Scheduled passes</div>
+    <section class="pane-body hidden" data-pane="passes" id="passes">
+      <div class="pane-head">
+        <h1>Scheduled passes</h1>
+        <span class="note">the watcher's own journal</span>
+      </div>
       <table>
-        <thead><tr><th style="width:200px">When</th><th style="width:120px">Window</th>
-          <th>Found</th></tr></thead>
-        <tbody id="inv-passes"><tr><td colspan="3" class="dim">nothing journaled yet</td></tr></tbody>
+        <thead><tr><th style="width:220px">When</th><th style="width:130px">Window</th>
+          <th style="width:110px">Seconds</th><th>Found</th></tr></thead>
+        <tbody id="inv-passes"><tr><td colspan="4" class="dim">nothing journaled yet</td></tr></tbody>
       </table>
     </section>
 
-    <section id="ledger">
-      <div class="eyebrow">Receipts</div>
+    <section class="pane-body hidden" data-pane="receipts" id="ledger">
+      <div class="pane-head">
+        <h1>Receipts</h1>
+        <span class="note">one per decision, refusals included</span>
+      </div>
       <table>
         <thead><tr><th style="width:190px">Transfer</th><th style="width:240px">Decision</th>
           <th>Destination transaction</th></tr></thead>
@@ -159,9 +126,57 @@
       </table>
     </section>
 
+    <section class="pane-body hidden" data-pane="burn" id="burn">
+      <div class="pane-head">
+        <h1>Burn</h1>
+        <span class="note">the payer side, signed by the key this instance holds</span>
+      </div>
+      <div class="payer-box" id="payer-box">reading&hellip;</div>
+      <div class="form-grid">
+        <div class="field">
+          <label for="payer-source">Source chain</label>
+          <select id="payer-source"></select>
+        </div>
+        <div class="field">
+          <label for="payer-destination">Destination chain</label>
+          <select id="payer-destination"></select>
+        </div>
+        <div class="field">
+          <label for="payer-amount">Amount (USDC)</label>
+          <input id="payer-amount" value="0.5" inputmode="decimal">
+        </div>
+        <div class="field">
+          <label for="payer-caller">Caller</label>
+          <input id="payer-caller" placeholder="optional">
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn primary" id="btn-open">Burn it</button>
+        <button class="btn outline" id="btn-open-finish">Burn and finish</button>
+      </div>
+      <p class="note" id="open-state" style="margin-top:14px">nothing sent yet</p>
+      <ol class="steps hidden" id="open-steps"></ol>
+      <div class="row" style="margin-top:12px">
+        <a class="btn outline sm hidden" id="open-link" target="_blank" rel="noreferrer">Burn</a>
+        <a class="btn outline sm hidden" id="mint-link" target="_blank" rel="noreferrer">Mint</a>
+        <a class="btn outline sm hidden" id="faucet" target="_blank" rel="noreferrer">Faucet</a>
+      </div>
+    </section>
+
+    <section class="pane-body hidden" data-pane="wallet" id="wallet">
+      <div class="pane-head">
+        <h1>Wallet</h1>
+        <span class="note">the same burn, signed by you</span>
+      </div>
+      <div class="row" style="margin-bottom:14px">
+        <button class="btn outline" id="btn-connect">Connect wallet</button>
+        <span class="dim" id="wallet-state" style="font-size:13px">not connected</span>
+      </div>
+      <button class="btn primary" id="btn-wallet-open" disabled>Approve and burn</button>
+    </section>
+
   </main>
 
-</div>
 </div>
 
 <script src="app.js"></script>
