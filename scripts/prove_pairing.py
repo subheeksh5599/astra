@@ -26,13 +26,14 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--blocks", type=int, default=6000)
+    ap.add_argument("--seconds", type=int, default=3600, help="how far back to read, in time")
+    ap.add_argument("--blocks", type=int, default=0, help="override the window in source blocks")
     ap.add_argument("--limit", type=int, default=20)
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args()
 
-    result = pairing.collect(blocks=args.blocks, limit=args.limit,
+    result = pairing.collect(blocks=args.blocks, limit=args.limit, seconds=args.seconds,
                              progress=None if args.quiet else lambda line: print(line, file=sys.stderr))
     rows, broken = result["rows"], pairing.broken(result)
 

@@ -37,14 +37,15 @@ def journal_path(when: float) -> str:
 
 
 def one_pass(pass_number: int, blocks: int, limit: int, quiet: bool,
-             watched_only: bool = False) -> dict:
+             watched_only: bool = False, seconds: int = 3600) -> dict:
     started = time.time()
-    result = pairing.collect(blocks=blocks, limit=limit, watched_only=watched_only,
+    result = pairing.collect(blocks=blocks, limit=limit, watched_only=watched_only, seconds=seconds,
                              progress=None if quiet else lambda line: print(f"  {line}", file=sys.stderr))
     broken = pairing.broken(result)
     entry = {
         "pass": pass_number,
         "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(started)),
+        "window_seconds": seconds,
         "window_blocks": blocks,
         "domains": result["domains"],
         "summary": pairing.summarise(result),
@@ -68,7 +69,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--once", action="store_true", help="run a single pass and exit")
     ap.add_argument("--interval", type=int, default=300, help="seconds between passes")
-    ap.add_argument("--blocks", type=int, default=3000)
+    ap.add_argument("--seconds", type=int, default=3600, help="how far back each pass reads, in time")
+    ap.add_argument("--blocks", type=int, default=0, help="override the window in source blocks")
     ap.add_argument("--limit", type=int, default=20)
     ap.add_argument("--passes", type=int, default=0, help="stop after this many passes (0 = forever)")
     ap.add_argument("--quiet", action="store_true")
@@ -80,7 +82,8 @@ def main() -> int:
     broken_seen: list = []
     while True:
         pass_number += 1
-        entry = one_pass(pass_number, args.blocks, args.limit, args.quiet, args.watched_only)
+        entry = one_pass(pass_number, args.blocks, args.limit, args.quiet, args.watched_only,
+                         args.seconds)
         if entry["broken"]:
             broken_seen.append(entry)
         if args.once:

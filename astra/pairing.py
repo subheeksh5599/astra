@@ -29,8 +29,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 from . import inflight, protocol
 from .attestation import Attestation
-from .config import (CHAIN_IDS, DOMAIN_NAMES, USDC, attestation_base, attestation_version,
-                     deployment, load_env, rpc_url, supports)
+from .config import (CHAIN_IDS, DOMAIN_NAMES, TRANSMITTERS, USDC, attestation_base,
+                     attestation_version, deployment, load_env, rpc_url, supports)
 from .rpc import Rpc
 
 # The destination's receipt event: source domain, the messenger that called it,
@@ -60,6 +60,47 @@ def transfer_key(source_domain: int, nonce) -> str:
         except ValueError:
             return f"{source_domain}:{text.lower()}"
     return f"{source_domain}:{text}"
+
+
+#: A window is a span of time, and chains disagree about how many blocks that is:
+#: the same 1,200 blocks is an hour on one chain and five minutes on another. When
+#: that is done wrong, a delivery that happened before the window looks like value
+#: that never moved -- the worst thing this module could say. So the destination is
+#: read over the same span of *time* as the source, and a key that is still absent is
+#: re-checked by its own topic over a much wider range before anything is called
+#: stranded.
+WIDE_RECHECK_FACTOR = 20
+#: Public endpoints refuse a wider range than this, so it is the widest honest ask.
+WIDE_RECHECK = 50_000
+RECEIVE_TOPIC = "0xff48c13eda96b1cceacc6b9edeedc9e9db9d6226afbc30146b720c19d3addb1c"
+
+
+def blocks_per_second(rpc: Rpc, behind: int = 2000) -> float:
+    """How fast a chain produces blocks. The reader measures it; this is the seam."""
+    return rpc.blocks_per_second(behind)
+
+
+def received_by_nonce(rpc: Rpc, domain: int, deployment_name: str, key: str, blocks: int) -> list:
+    """Ask the destination for one transfer by its own topic, not by scanning.
+
+    The nonce rides in an indexed topic of the receipt event, so this is an exact
+    question about one transfer: cheap enough to ask over a range wide enough that
+    "absent" means absent rather than "older than what I looked at".
+    """
+    parts = str(key).split(":")
+    if len(parts) != 2:
+        return []
+    try:
+        source_domain, nonce = int(parts[0]), int(parts[1])
+    except ValueError:
+        return []
+    receiver = TRANSMITTERS[deployment_name].get(domain)
+    if receiver is None:
+        return []
+    head = rpc.block_number()
+    logs = rpc.get_logs(receiver, [RECEIVE_TOPIC, None, "0x" + nonce.to_bytes(32, "big").hex()],
+                        max(1, head - blocks), head)
+    return [log.get("transactionHash") for log in logs if log.get("transactionHash")]
 
 
 def receipts(rpc: Rpc, domain: int, deployment_name: str, blocks: int) -> dict:
@@ -139,9 +180,10 @@ def verdict(attestation_state, delivered, watched: bool) -> str:
     return "unknown"
 
 
-def collect(env: dict | None = None, blocks: int = 6000, limit: int = 20,
+def collect(env: dict | None = None, blocks: int = 0, limit: int = 20,
             rpcs: dict | None = None, attestation=None, progress=None,
-            watched_only: bool = False) -> dict:
+            watched_only: bool = False, per_domain: int | None = None,
+            seconds: int = 3600) -> dict:
     """Walk every transfer the source chains announced, and pair each one.
 
     Returns {"rows": [...], "duplicates": [...], "domains": {...}} so a caller can
@@ -161,23 +203,78 @@ def collect(env: dict | None = None, blocks: int = 6000, limit: int = 20,
     if progress:
         progress(f"reading {len(domains)} chains: {', '.join(DOMAIN_NAMES.get(d, str(d)) for d in domains)}")
 
-    def read_chain(domain: int):
-        """One chain's announcements and its receipts. Independent of the others,
-        so a slow endpoint costs its own chain and not the whole pass."""
+    # One window is a span of time that every chain has to be asked for in its own
+    # blocks: the source window is the yardstick, and each chain's block rate turns
+    # it into that chain's block count.
+    rates: dict = {}
+    for domain in domains:
         try:
-            return domain, (inflight.scan(rpc_for(domain), domain, blocks, deployment=name),
-                            receipts(rpc_for(domain), domain, name, blocks))
-        except Exception:  # noqa: BLE001 - one endpoint must not blind the others
-            return domain, ([], {})
+            rates[domain] = blocks_per_second(rpc_for(domain))
+        except Exception:  # noqa: BLE001
+            rates[domain] = 0.0
+
+    if seconds:
+        # A span of time is the same history everywhere; the same block count is not.
+        span_seconds = float(seconds)
+    else:
+        spans = [blocks / rate for rate in rates.values() if rate > 0]
+        span_seconds = max(spans) if spans else 0.0
+
+    def source_window_for(domain: int) -> int:
+        """How far back to read this chain's announcements."""
+        rate = rates.get(domain) or 0.0
+        if seconds and rate > 0:
+            return min(WIDE_RECHECK, max(200, int(seconds * rate)))
+        return blocks or 1200
+
+    def window_for(domain: int) -> int:
+        """The same span of time, in this chain's blocks, inside what an endpoint will answer.
+
+        Public endpoints refuse a range wider than WIDE_RECHECK, and a refused read
+        would silently empty a chain, so the window is capped there; anything older
+        is caught by the per-nonce re-check, which is an exact question rather than
+        a scan.
+        """
+        rate = rates.get(domain) or 0.0
+        if not span_seconds or rate <= 0:
+            return blocks or 1200
+        # A little wider than the span, so a slow answer is late rather than absent.
+        return min(WIDE_RECHECK, max(200, int(span_seconds * rate * 1.5)))
+
+    def read_chain(domain: int) -> tuple:
+        """One chain's announcements and its receipts, read apart.
+
+        They are separate questions and separate failures: a receipts read that
+        fails must not blind the collection to that chain's announcements, which is
+        exactly the transfer this pass exists to find.
+        """
+        announced: list = []
+        counted: dict = {}
+        try:
+            announced = inflight.scan(rpc_for(domain), domain, source_window_for(domain),
+                                      deployment=name)
+        except Exception:  # noqa: BLE001
+            announced = []
+        try:
+            counted = receipts(rpc_for(domain), domain, name, window_for(domain))
+        except Exception:  # noqa: BLE001
+            counted = {}
+        return domain, (announced, counted)
 
     with ThreadPoolExecutor(max_workers=max(1, len(domains))) as pool:
         read = dict(pool.map(read_chain, domains))
 
+    # A cap per chain, for the same reason the collection has one: one busy chain
+    # must not fill the window, because the transfers it would hide are exactly the
+    # ones nobody else is looking at.
+    if per_domain is None:
+        per_domain = max(3, limit // max(1, len(domains)))
     sources: list = []
     received: dict = {}
     for domain in domains:
         announced, counted = read.get(domain, ([], {}))
-        sources.extend(announced)
+        announced = sorted(announced, key=lambda item: item.get("block") or 0, reverse=True)
+        sources.extend(announced[:per_domain])
         received[domain] = counted
 
     sources.sort(key=lambda item: item.get("block") or 0, reverse=True)
@@ -205,8 +302,20 @@ def collect(env: dict | None = None, blocks: int = 6000, limit: int = 20,
             amount = parsed.get("amount")
 
         watched = destination in CHAIN_IDS and supports(env, destination)
-        seen = received.get(destination) or {}
-        seen = seen.get(transfer_key(transfer["source_domain"], nonce)) or []
+        key = transfer_key(transfer["source_domain"], nonce)
+        seen = (received.get(destination) or {}).get(key) or []
+        recheck_blocks = 0
+        if not seen and watched and nonce is not None:
+            # Absent from the window is not absent from the chain. Ask the
+            # destination about this one nonce directly, over a range wide enough
+            # that a delivery older than the window cannot hide behind it.
+            recheck_blocks = min(WIDE_RECHECK, max(int(window_for(destination) * WIDE_RECHECK_FACTOR), 50_000))
+            try:
+                seen = received_by_nonce(rpc_for(destination), destination, name, key, recheck_blocks)
+            except Exception:  # noqa: BLE001 - an unreadable re-check is reported as no evidence
+                seen = []
+            if seen and progress:
+                progress(f"{key} was delivered outside the window; the re-check found it")
         state = att.get("state")
 
         # A delivery is a pair of numbers: what left, and what arrived. The dif-
@@ -232,6 +341,8 @@ def collect(env: dict | None = None, blocks: int = 6000, limit: int = 20,
             "verdict": verdict(state, seen, watched),
             "delivered_count": len(seen),
             "mint_txs": seen,
+            "receipt_window_blocks": window_for(destination) if destination is not None else None,
+            "recheck_blocks": recheck_blocks,
             "expected_amount": expected,
             "fee_executed": fee,
             "minted_amount": minted,
@@ -254,7 +365,9 @@ def collect(env: dict | None = None, blocks: int = 6000, limit: int = 20,
         rows = [row for row in rows if row["verdict"] != "unwatched"]
     duplicates = [row for row in rows if row["delivered_count"] > 1]
     return {"rows": rows, "duplicates": duplicates,
-            "domains": {str(domain): len(counted) for domain, counted in received.items()}}
+            "domains": {str(domain): len(counted) for domain, counted in received.items()},
+            "span_seconds": span_seconds,
+            "rates": {str(domain): round(rate, 4) for domain, rate in rates.items()}}
 
 
 def broken(result: dict) -> list:

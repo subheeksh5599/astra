@@ -165,9 +165,10 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- handlers ---------------------------------------------------------
     def inflight(self, query, env):
-        blocks = int((query.get("blocks") or ["1200"])[0])
+        seconds = int((query.get("seconds") or ["3600"])[0])
+        blocks = int((query.get("blocks") or ["0"])[0])
         limit = int((query.get("limit") or ["12"])[0])
-        key = (blocks, limit)
+        key = (seconds, blocks, limit)
         now = time.time()
         with _SCAN_LOCK:
             cached = _SCAN_CACHE.get(key)
@@ -176,12 +177,13 @@ class Handler(BaseHTTPRequestHandler):
                                        "age_seconds": round(now - cached["at"], 1),
                                        "cached": True})
         try:
-            rows = build_inflight(env, blocks, limit)
+            rows = build_inflight(env, blocks, limit, seconds=seconds)
         except Exception as exc:  # noqa: BLE001
             return self.send_json({"error": str(exc)[:300]}, 502)
         with _SCAN_LOCK:
             _SCAN_CACHE[key] = {"rows": rows, "at": time.time()}
-        return self.send_json({"rows": rows, "blocks": blocks, "age_seconds": 0.0, "cached": False})
+        return self.send_json({"rows": rows, "blocks": blocks, "seconds": seconds,
+                               "age_seconds": 0.0, "cached": False})
 
     def inspect(self, query, env):
         """Read one transfer, decide, and broadcast nothing.
@@ -211,9 +213,10 @@ class Handler(BaseHTTPRequestHandler):
         has exactly one mint, how much value actually arrived, and the journal of
         scheduled passes. Read-only; nothing here moves anything.
         """
-        blocks = int((query.get("blocks") or ["2600"])[0])
+        seconds = int((query.get("seconds") or ["3600"])[0])
+        blocks = int((query.get("blocks") or ["0"])[0])
         limit = int((query.get("limit") or ["14"])[0])
-        key = ("pairing", blocks, limit)
+        key = ("pairing", seconds, blocks, limit)
         now = time.time()
         with _SCAN_LOCK:
             cached = _SCAN_CACHE.get(key)
@@ -221,12 +224,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({**cached["rows"], "cached": True,
                                        "age_seconds": round(now - cached["at"], 1)})
         try:
-            result = pairing.collect(blocks=blocks, limit=limit)
+            result = pairing.collect(blocks=blocks, limit=limit, seconds=seconds)
         except Exception as exc:  # noqa: BLE001
             return self.send_json({"error": str(exc)[:300]}, 502)
         broken = pairing.broken(result)
         payload = {
             "blocks": blocks,
+            "span_seconds": result.get("span_seconds"),
+            "rates": result.get("rates"),
             "summary": pairing.summarise(result),
             "rows": result["rows"],
             "broken": broken,
@@ -399,7 +404,24 @@ class Handler(BaseHTTPRequestHandler):
         return self.send_json({"error": "not found", "path": path}, 404)
 
 
-def build_inflight(env: dict, blocks: int, limit: int) -> list:
+def scan_window(env: dict, domain: int, blocks: int, seconds: int) -> tuple:
+    """How far back to read one chain, and the rate that decision came from.
+
+    A window given in seconds is the same span of history on every chain; one given
+    in blocks is not, because a block is a different amount of time on each of them.
+    The rate is measured from the chain itself, and the request is kept inside what
+    a public endpoint will answer.
+    """
+    rpc = Rpc(rpc_url(env, domain))
+    if not seconds:
+        return rpc, blocks
+    rate = rpc.blocks_per_second()
+    if rate <= 0:
+        return rpc, blocks or 1200
+    return rpc, min(50_000, max(200, int(seconds * rate)))
+
+
+def build_inflight(env: dict, blocks: int, limit: int, seconds: int = 0) -> list:
     """The transfers in flight, newest first, across every watched chain.
 
     Candidates are collected from every source chain before any of them is
@@ -422,10 +444,10 @@ def build_inflight(env: dict, blocks: int, limit: int) -> list:
 
     def scan_one(domain: int) -> list:
         try:
+            rpc, window = scan_window(env, domain, blocks, seconds)
             # A cap per chain keeps one busy chain from filling the whole view:
             # the point of watching five is seeing five.
-            return inflight.scan(Rpc(rpc_url(env, domain)), domain, blocks,
-                                 deployment=name)[:per_domain]
+            return inflight.scan(rpc, domain, window, deployment=name)[:per_domain]
         except Exception:  # noqa: BLE001 - one chain's endpoint must not blind the others
             return []
 

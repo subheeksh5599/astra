@@ -44,6 +44,29 @@ class Rpc:
     def call_contract(self, to: str, data: str) -> str:
         return self.call("eth_call", [{"to": to, "data": data}, "latest"])
 
+    def blocks_per_second(self, behind: int = 2000) -> float:
+        """How fast this chain produces blocks, measured rather than assumed.
+
+        A window is a span of time, and chains disagree about how many blocks that
+        is: the same 1,200 blocks is four hours on one chain and five minutes on
+        another. Anything that reads two chains over "the same number of blocks" is
+        reading two different amounts of history.
+        """
+        head = self.call("eth_getBlockByNumber", ["latest", False]) or {}
+        try:
+            head_number = int(head["number"], 16)
+            head_time = int(head["timestamp"], 16)
+        except (KeyError, TypeError, ValueError):
+            return 0.0
+        old_number = max(1, head_number - behind)
+        old = self.call("eth_getBlockByNumber", [hex(old_number), False]) or {}
+        try:
+            seconds = head_time - int(old["timestamp"], 16)
+            count = head_number - old_number
+        except (KeyError, TypeError, ValueError):
+            return 0.0
+        return (count / seconds) if seconds > 0 and count > 0 else 0.0
+
     def transaction_receipt(self, tx_hash: str) -> dict:
         return self.call("eth_getTransactionReceipt", [tx_hash]) or {}
 
