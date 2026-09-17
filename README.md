@@ -236,6 +236,11 @@ and includes the package, the service and the committed artifacts in the bundle.
     vercel link --project astra
     printf '%s' "$KH_API_KEY" | vercel env add KH_API_KEY production
     vercel deploy --prod --yes
+    vercel alias set <the deployment URL that was just printed> astra-rail.vercel.app
+
+That last line matters: a manual alias pins one deployment, so it has to be re-pointed
+after every production deploy or the pretty URL keeps serving the previous build. Verify by
+grepping the served HTML for something only the new build has, not by status code.
 
 Three environment variables are all it needs: the execution layer's key, the attestation base, and
 `ASTRA_READ_ONLY=1`. No paying key is set there, which is why the page tells a visitor to sign the
