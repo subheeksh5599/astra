@@ -160,7 +160,7 @@ function bindTrace() {
       out.classList.add("hidden");
       return;
     }
-    text(el("trace-note"), "reading both chains\\u2026");
+    text(el("trace-note"), "reading every watched chain\\u2026");
     try {
       const receipt = await jget(`/api/inspect?burn_tx=${encodeURIComponent(value)}`);
       renderTrace(receipt);
@@ -215,9 +215,9 @@ async function refresh() {
   const blocks = Number(el("filter-blocks").value || 1200);
   const started = Date.now();
   const ticker = setInterval(() => {
-    text(el("last-scan"), `reading both chains\u2026 ${Math.round((Date.now() - started) / 1000)}s`);
+    text(el("last-scan"), `reading every watched chain\u2026 ${Math.round((Date.now() - started) / 1000)}s`);
   }, 1000);
-  text(el("last-scan"), "reading both chains\u2026");
+  text(el("last-scan"), "reading every watched chain\u2026");
   try {
     const body = await jget(`/api/inflight?blocks=${blocks}&limit=14`);
     ASTRAA.rows = body.rows || [];

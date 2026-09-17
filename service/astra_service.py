@@ -29,7 +29,8 @@ sys.path.insert(0, ROOT)
 from astra import inflight  # noqa: E402
 from astra.attestation import Attestation  # noqa: E402
 from astra.config import (CHAIN_IDS, DOMAIN_NAMES, MESSENGERS, USDC, attestation_base,  # noqa: E402
-                          attestation_version, deployment, load_env, rpc_url)
+                          attestation_version, deployment, load_env, rpc_url, supports,
+                          transmitter)
 from astra.keeperhub import KeeperHub  # noqa: E402
 from astra.rail import Rail  # noqa: E402
 from astra.rpc import Rpc  # noqa: E402
@@ -49,17 +50,20 @@ def public_config(env: dict) -> dict:
     name = deployment(env)
     chains = {}
     for domain, chain_id in CHAIN_IDS.items():
+        if not supports(env, domain):
+            continue
         chains[str(domain)] = {
             "domain": domain,
             "chain_id": chain_id,
             "name": DOMAIN_NAMES.get(domain, str(domain)),
             "usdc": USDC[domain],
             "messenger": MESSENGERS[name][domain],
+            "transmitter": transmitter(env, domain),
         }
     return {
         "deployment": name,
         "chains": chains,
-        "watched_domains": sorted(CHAIN_IDS),
+        "watched_domains": sorted(chains),
         "attestation_base": attestation_base(env),
         "faucet": env.get("FAUCET_URL", ""),
     }
@@ -251,15 +255,26 @@ def build_inflight(env: dict, blocks: int, limit: int) -> list:
     attestation = Attestation(attestation_base(env), attestation_version(env))
     wallet = kh.wallet()
 
+    per_domain = int(env.get("ASTRA_PER_DOMAIN", "10"))
     candidates = []
     for source in sorted(CHAIN_IDS):
+        if not supports(env, source):
+            continue
         rpc = Rpc(rpc_url(env, source))
-        candidates.extend(inflight.scan(rpc, source, blocks, deployment=name))
+        found = inflight.scan(rpc, source, blocks, deployment=name)
+        # A cap per chain keeps one busy chain from filling the whole view: the
+        # point of watching five is seeing five.
+        candidates.extend(found[:per_domain])
     candidates.sort(key=lambda item: item.get("block") or 0, reverse=True)
 
-    rows = []
+    # Most traffic on a live testnet goes to chains this rail does not serve. A
+    # view that is 90% "not mine" hides the transfers it can actually finish, so
+    # those are held back and shown up to a small cap: enough to see the boundary,
+    # never enough to bury the work.
+    reachable, beyond = [], []
+    max_beyond = int(env.get("ASTRA_MAX_BEYOND", "3"))
     for transfer in candidates:
-        if len(rows) >= limit:
+        if len(reachable) >= limit and len(beyond) >= max_beyond:
             break
         record = inflight.state_of_transfer(kh, attestation, {**env, "ASTRA_DEPLOYMENT": name},
                                             transfer, wallet=wallet)
@@ -267,7 +282,11 @@ def build_inflight(env: dict, blocks: int, limit: int) -> list:
             continue  # a source log with no message behind it is not a transfer
         parsed = record.get("parsed") or {}
         destination = parsed.get("destination_domain")
-        rows.append({
+        reason = (record.get("decision") or {}).get("reason")
+        bucket = beyond if reason in ("UNSUPPORTED_DOMAIN", "DEPLOYMENT_ABSENT") else reachable
+        if len(bucket) >= (max_beyond if bucket is beyond else limit):
+            continue
+        bucket.append({
             "burn_tx": record["burn_tx"],
             "source_domain": record["source_domain"],
             "destination_domain": destination,
@@ -284,7 +303,7 @@ def build_inflight(env: dict, blocks: int, limit: int) -> list:
             "finished": record.get("finished"),
             "block": record.get("block"),
         })
-    return rows
+    return reachable + beyond
 
 
 def main() -> int:
