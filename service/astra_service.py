@@ -179,3 +179,108 @@ class Handler(BaseHTTPRequestHandler):
         with open(path, encoding="utf-8") as fh:
             return self.send_json(json.load(fh))
 
+    def complete(self, body):
+        burn_tx = (body or {}).get("burn_tx")
+        if not burn_tx or not isinstance(burn_tx, str) or not burn_tx.startswith("0x"):
+            return self.send_json({"error": "burn_tx is required"}, 400)
+        env = load_env()
+        request = {
+            "source_domain": int(body.get("source_domain", 6)),
+            "destination_domain": int(body.get("destination_domain", 0)),
+            "burn_tx": burn_tx,
+        }
+        wait = int(body.get("wait_seconds") or 0)
+        try:
+            rail = Rail(env)
+            receipt = rail.run(request, max_wait=wait, interval=10) if wait else rail.run(request)
+            rail.write_receipt(receipt)
+        except Exception as exc:  # noqa: BLE001
+            return self.send_json({"error": str(exc)[:300]}, 502)
+        return self.send_json(receipt)
+
+    def static(self, path):
+        if path in ("/", "/index.html"):
+            return self.send_file(os.path.join(WEB, "index.html"), "text/html; charset=utf-8")
+        if path in ("/app", "/app.html"):
+            return self.send_file(os.path.join(WEB, "app.html"), "text/html; charset=utf-8")
+        candidate = os.path.normpath(os.path.join(WEB, path.lstrip("/")))
+        if not candidate.startswith(WEB):
+            return self.send_json({"error": "not found"}, 404)
+        if os.path.isfile(candidate):
+            ext = os.path.splitext(candidate)[1]
+            types = {".css": "text/css", ".js": "application/javascript",
+                     ".woff2": "font/woff2", ".svg": "image/svg+xml",
+                     ".json": "application/json", ".html": "text/html; charset=utf-8"}
+            return self.send_file(candidate, types.get(ext, "application/octet-stream"))
+        return self.send_json({"error": "not found", "path": path}, 404)
+
+
+def build_inflight(env: dict, blocks: int, limit: int) -> list:
+    """The transfers in flight, newest first, across every watched chain.
+
+    Candidates are collected from every source first and merged by block before
+    any of them is classified: reading one chain to exhaustion would hide the
+    other chain's transfers behind it, which is exactly the blind spot this rail
+    exists to remove.
+    """
+    name = deployment(env)
+    kh = KeeperHub(env["KH_API_KEY"])
+    attestation = Attestation(attestation_base(env), attestation_version(env))
+    wallet = kh.wallet()
+
+    candidates = []
+    for source in sorted(CHAIN_IDS):
+        rpc = Rpc(rpc_url(env, source))
+        candidates.extend(inflight.scan(rpc, source, blocks, deployment=name))
+    candidates.sort(key=lambda item: item.get("block") or 0, reverse=True)
+
+    rows = []
+    for transfer in candidates:
+        if len(rows) >= limit:
+            break
+        record = inflight.state_of_transfer(kh, attestation, {**env, "ASTRA_DEPLOYMENT": name},
+                                            transfer, wallet=wallet)
+        if record.get("attestation_state") == "not_found":
+            continue  # a source log with no message behind it is not a transfer
+        parsed = record.get("parsed") or {}
+        destination = parsed.get("destination_domain")
+        rows.append({
+            "burn_tx": record["burn_tx"],
+            "source_domain": record["source_domain"],
+            "destination_domain": destination,
+            "destination_name": DOMAIN_NAMES.get(destination, str(destination) if destination is not None else None),
+            "transfer_id": f"{record['source_domain']}:{parsed.get('nonce')}" if parsed.get("nonce")
+            else f"{record['source_domain']}:{record['burn_tx'][:12]}",
+            "nonce": parsed.get("nonce"),
+            "mint_recipient": parsed.get("mint_recipient"),
+            "amount": parsed.get("amount"),
+            "amount_usdc": (parsed.get("amount") or 0) / 1e6,
+            "destination_caller": parsed.get("destination_caller"),
+            "attestation_state": record.get("attestation_state"),
+            "decision": record.get("decision"),
+            "finished": record.get("finished"),
+            "block": record.get("block"),
+        })
+    return rows
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8099")))
+    ap.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
+    args = ap.parse_args()
+    env = load_env()
+    if not env.get("KH_API_KEY"):
+        print("warning: KH_API_KEY is not set; /api/complete and discovery will fail")
+    server = ThreadingHTTPServer((args.host, args.port), Handler)
+    print(f"astra listening on http://{args.host}:{args.port} "
+          f"(deployment {deployment(env)}, collecting on {sorted(CHAIN_IDS)})")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("stopping")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
