@@ -5,12 +5,16 @@ wallet. If a refusal can be reached in a test, it can be explained in a demo.
 """
 from __future__ import annotations
 
+import json
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from astra import classifier, protocol  # noqa: E402
+
+FIXTURES = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                       "fixtures", "captured.json"), encoding="utf-8"))
 
 WALLET = "0x1776D4D751d97c85845bF54e6CE364CEc62D4bBf"
 RECIPIENT = "0x3991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad9"
@@ -140,3 +144,83 @@ def test_interpreting_a_simulation_response():
                                                "error": "execution reverted: Nonce already used"})
     assert reverted["ok"] is False and reverted["already_delivered"] is True
     assert classifier.interpret_preflight(None)["ok"] is False
+
+
+def test_a_message_with_no_caller_field_is_never_refused_for_a_caller():
+    """The caller refusal belongs to the layout that has a caller.
+
+    On the older deployment the burn takes no destination caller, so a transfer
+    there can be delivered by anyone. Refusing it because `destination_caller` is
+    unset would refuse a transfer the protocol explicitly allows, which is the
+    kind of over-refusal that makes a rail useless.
+    """
+    import json as _json
+    import os as _os
+    from astra import protocol
+    fixtures = _json.load(open(_os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                                             "fixtures", "captured.json"), encoding="utf-8"))
+    message = protocol.parse(fixtures["open_transfer_v1"]["message"])
+    decision = classifier.decide({"source_domain": 6, "destination_domain": 0},
+                                 {"attestation": {"state": "complete"}, "message": message,
+                                  "executing_wallet": "0x1111111111111111111111111111111111111111",
+                                  "destination_record": {"used": False},
+                                  "preflight": {"ok": True}})
+    assert decision["action"] == classifier.COMPLETE
+    assert decision["reason"] == "READY"
+
+
+def test_a_chain_without_this_deployment_is_refused_by_name():
+    """Five chains are watched, but the earlier deployment only exists on two.
+
+    A transfer to a chain the deployment is not on has no transmitter to call.
+    The rail must say that rather than attempt it, and the refusal must be its
+    own reason so the receipt does not blame the message for the deployment.
+    """
+    from astra import protocol
+    message = protocol.parse(FIXTURES["open_transfer_v2"]["message"])
+    decision = classifier.decide(
+        {"source_domain": 6, "destination_domain": 0},
+        {"attestation": {"state": "complete"}, "message": message,
+         "executing_wallet": "0x1111111111111111111111111111111111111111",
+         "destination_record": {"used": False}, "preflight": {"ok": True},
+         "transmitter_address": None})
+    assert decision["action"] == classifier.REFUSE
+    assert decision["reason"] == "DEPLOYMENT_ABSENT"
+
+
+def test_an_unobserved_transmitter_is_not_treated_as_a_missing_one():
+    """An absent observation is not evidence; only a recorded absence is."""
+    from astra import protocol
+    message = protocol.parse(FIXTURES["open_transfer_v2"]["message"])
+    decision = classifier.decide(
+        {"source_domain": 6, "destination_domain": 0},
+        {"attestation": {"state": "complete"}, "message": message,
+         "destination_record": {"used": False}, "preflight": {"ok": True}})
+    assert decision["reason"] != "DEPLOYMENT_ABSENT"
+
+
+def test_the_watched_domains_match_the_chains_the_deployment_is_on():
+    """The list the classifier trusts and the map the rail calls must agree.
+
+    A domain that is watched but has no contract is a refusal that can never
+    succeed; a domain with a contract that is not watched is an available
+    delivery that is silently refused. Both are bugs, so they fail here.
+    """
+    from astra import config
+    env = {"ASTRA_DEPLOYMENT": "v2"}
+    watched = set(classifier.WATCHED_DOMAINS)
+    present = {domain for domain in config.CHAIN_IDS if config.supports(env, domain)}
+    assert watched == present
+
+    older = {"ASTRA_DEPLOYMENT": "v1"}
+    assert config.supports(older, 0) and config.supports(older, 6)
+    assert not config.supports(older, 2)
+    assert config.transmitter(older, 2) is None
+
+
+def test_every_watched_domain_has_a_token_and_a_chain_id():
+    from astra import config
+    for domain in classifier.WATCHED_DOMAINS:
+        assert domain in config.CHAIN_IDS
+        assert domain in config.USDC
+        assert domain in config.DEFAULT_RPC

@@ -78,6 +78,9 @@ def main() -> int:
     target = messenger(env, args.source)
     payer = env["BUYER"]
     amount = int(float(args.amount) * 1_000_000)
+    if args.deployment == "v1" and args.caller:
+        raise SystemExit("this deployment's burn takes no destination caller; "
+                         "a named caller exists only on the later deployment")
     caller32 = "0x" + "0" * 64 if not args.caller else "0x" + "0" * 24 + args.caller[2:].lower()
     threshold = args.threshold if args.threshold is not None else (
         FAST_THRESHOLD if args.deployment != "v1" else STANDARD_THRESHOLD)
