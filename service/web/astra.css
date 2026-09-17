@@ -330,3 +330,23 @@ ol.steps .dim{font-variant-numeric:tabular-nums}
 .strip-item{display:inline-flex;align-items:center;gap:10px;font-size:12px}
 td .count .tag{font-size:12px}
 .card .counters{margin:24px 0 18px}
+
+
+/* --- a clean dashboard: labels, numbers, tables ---------------------- */
+.crumb{
+  font-size:15px;font-weight:600;letter-spacing:-.2px;color:var(--ink);
+  padding-left:22px;position:relative;
+}
+.crumb::before{
+  content:"";position:absolute;left:0;top:50%;width:16px;height:16px;margin-top:-8px;
+  background:var(--mint);border-radius:2px;
+}
+.side-block{margin-bottom:36px}
+.side-block + .side-block{padding-top:28px;border-top:1px solid var(--mist)}
+.side-block .note{margin:0}
+.main section{padding-block:0;margin-bottom:72px}
+.main section:last-child{margin-bottom:0}
+.main .eyebrow{margin-bottom:18px}
+.main .counters{margin:0 0 20px}
+.main table{margin-top:4px}
+@media(max-width:1000px){.main section{margin-bottom:56px}}

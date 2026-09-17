@@ -10,10 +10,10 @@
 
 <nav class="nav">
   <div class="wrap nav-in">
-    <a class="logo" href="/"><i></i><span>ASTRA</span></a>
+    <span class="crumb">Control surface</span>
     <div class="nav-links">
-      <a href="/">Overview</a>
-      <a href="#collection">Collection</a>
+      <a href="#collection">Transfers</a>
+      <a href="#invariant">Invariant</a>
       <a href="#ledger">Receipts</a>
     </div>
     <span class="spacer"></span>
@@ -28,130 +28,111 @@
 <div class="shell">
 
   <aside class="side">
-    <div class="eyebrow">Do a transfer</div>
-    <h3>From the key this machine holds</h3>
-    <p class="note" style="margin-bottom:16px">
-      The rail signs nothing. This is the payer side, and it is your key: you approve, you burn, and
-      the message names your address as the recipient. Leave the caller blank to let anyone finish it,
-      or name an address to make it theirs alone.
-    </p>
 
-    <div class="payer-box" id="payer-box">reading the payer side…</div>
+    <div class="side-block">
+      <div class="eyebrow">Payer</div>
+      <div class="payer-box" id="payer-box">reading&hellip;</div>
 
-    <div class="field">
-      <label for="payer-source">Source chain</label>
-      <select id="payer-source"></select>
-    </div>
-    <div class="field">
-      <label for="payer-amount">Amount (USDC)</label>
-      <input id="payer-amount" value="0.5" inputmode="decimal">
-    </div>
-    <div class="field">
-      <label for="payer-destination">Destination chain</label>
-      <select id="payer-destination"></select>
-    </div>
-    <div class="field">
-      <label for="payer-caller">Only this address may complete</label>
-      <input id="payer-caller" placeholder="optional">
-    </div>
+      <div class="field">
+        <label for="payer-source">Source chain</label>
+        <select id="payer-source"></select>
+      </div>
+      <div class="field">
+        <label for="payer-amount">Amount (USDC)</label>
+        <input id="payer-amount" value="0.5" inputmode="decimal">
+      </div>
+      <div class="field">
+        <label for="payer-destination">Destination chain</label>
+        <select id="payer-destination"></select>
+      </div>
+      <div class="field">
+        <label for="payer-caller">Caller</label>
+        <input id="payer-caller" placeholder="optional">
+      </div>
 
-    <div class="row">
-      <button class="btn primary" id="btn-open">Burn it</button>
-      <button class="btn outline" id="btn-open-finish">Burn and finish</button>
-    </div>
-    <p class="note" id="open-state" style="margin-top:12px">nothing sent yet</p>
-    <ol class="steps hidden" id="open-steps"></ol>
-    <div class="row" style="margin-top:8px">
-      <a class="btn outline sm hidden" id="open-link" target="_blank" rel="noreferrer">The burn</a>
-      <a class="btn outline sm hidden" id="mint-link" target="_blank" rel="noreferrer">The mint</a>
-      <a class="btn outline sm hidden" id="faucet" target="_blank" rel="noreferrer">Testnet faucet</a>
+      <div class="row">
+        <button class="btn primary" id="btn-open">Burn it</button>
+        <button class="btn outline" id="btn-open-finish">Burn and finish</button>
+      </div>
+      <p class="note" id="open-state" style="margin-top:12px">nothing sent yet</p>
+      <ol class="steps hidden" id="open-steps"></ol>
+      <div class="row" style="margin-top:8px">
+        <a class="btn outline sm hidden" id="open-link" target="_blank" rel="noreferrer">Burn</a>
+        <a class="btn outline sm hidden" id="mint-link" target="_blank" rel="noreferrer">Mint</a>
+        <a class="btn outline sm hidden" id="faucet" target="_blank" rel="noreferrer">Faucet</a>
+      </div>
     </div>
 
-    <div style="margin-top:28px;padding-top:20px;border-top:1px solid var(--mist)">
-      <div class="eyebrow">Or sign it yourself</div>
-      <p class="note" style="margin-bottom:12px">
-        The same burn, signed in your own wallet instead of the one this machine holds. This is
-        the path that always works, including on a hosted instance, which keeps no key.
-      </p>
+    <div class="side-block">
+      <div class="eyebrow">Wallet</div>
       <div class="row" style="margin-bottom:12px">
-        <button class="btn outline sm" id="btn-connect">Connect wallet</button>
+        <button class="btn outline sm" id="btn-connect">Connect</button>
         <span class="dim" id="wallet-state" style="font-size:13px">not connected</span>
       </div>
-      <button class="btn outline" id="btn-wallet-open" disabled>Approve and burn in the wallet</button>
+      <button class="btn outline" id="btn-wallet-open" disabled>Approve and burn</button>
     </div>
 
-    <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--mist)">
+    <div class="side-block">
       <div class="eyebrow">Window</div>
       <div class="field">
-        <label for="filter-blocks">How far back to read</label>
+        <label for="filter-blocks">Read back</label>
         <select id="filter-blocks">
-          <option value="3600" selected>1 hour — the same hour on every chain</option>
+          <option value="3600" selected>1 hour</option>
           <option value="18000">5 hours</option>
           <option value="86400">1 day</option>
         </select>
-        <p class="note">A window is a span of time, not a number of blocks: the same
-        1,200 blocks is four hours on one of these chains and five minutes on another.</p>
       </div>
       <p class="note" id="cfg-line">reading configuration</p>
     </div>
+
   </aside>
 
-  <main class="main" id="collection">
-    <div class="eyebrow">The collection</div>
-    <h2>Transfers in flight</h2>
-    <div class="counters">
-      <div><div class="v" id="c-inflight">&middot;</div><div class="k">in flight</div></div>
-      <div><div class="v" id="c-ready">&middot;</div><div class="k">deliverable</div></div>
-      <div><div class="v" id="c-waiting">&middot;</div><div class="k">waiting</div></div>
-      <div><div class="v" id="c-refused">&middot;</div><div class="k">refused</div></div>
-    </div>
-    <p class="note" id="last-scan" style="margin-bottom:20px">not scanned yet</p>
+  <main class="main">
 
-    <div class="states" style="margin-bottom:16px">
-      <span><i class="ok"></i>deliverable or paired</span>
-      <span><i class="no"></i>refused, money did not move</span>
-      <span><i class="wait"></i>waiting on the attestation</span>
-    </div>
+    <section id="collection">
+      <div class="eyebrow">Transfers in flight</div>
+      <div class="counters">
+        <div><div class="v" id="c-inflight">&middot;</div><div class="k">in flight</div></div>
+        <div><div class="v" id="c-ready">&middot;</div><div class="k">deliverable</div></div>
+        <div><div class="v" id="c-waiting">&middot;</div><div class="k">waiting</div></div>
+        <div><div class="v" id="c-refused">&middot;</div><div class="k">refused</div></div>
+      </div>
+      <div class="row" style="justify-content:space-between;margin-bottom:16px">
+        <div class="states">
+          <span><i class="ok"></i>deliverable</span>
+          <span><i class="no"></i>refused</span>
+          <span><i class="wait"></i>waiting</span>
+        </div>
+        <span class="note" id="last-scan">not scanned yet</span>
+      </div>
 
-    <table>
-      <thead>
-        <tr>
-          <th style="width:180px">Transfer</th>
-          <th style="width:150px">Amount</th>
-          <th style="width:150px">Destination</th>
-          <th style="width:110px">Attestation</th>
-          <th>Rail decision</th>
-          <th style="width:130px">&nbsp;</th>
-        </tr>
-      </thead>
-      <tbody id="rows"><tr><td colspan="6" class="skel"></td></tr></tbody>
-    </table>
-
-    <div id="receipt" class="hidden" style="margin-top:24px"></div>
-
-    <div style="margin-top:48px" id="ledger">
-      <div class="eyebrow">Receipts</div>
-      <h3>Every decision, including the ones that moved nothing</h3>
       <table>
-        <thead><tr><th style="width:180px">Transfer</th><th style="width:240px">Decision</th><th>Destination transaction</th></tr></thead>
-        <tbody id="ledger-rows"><tr><td colspan="3" class="skel"></td></tr></tbody>
+        <thead>
+          <tr>
+            <th style="width:190px">Transfer</th>
+            <th style="width:140px">Amount</th>
+            <th style="width:150px">Destination</th>
+            <th style="width:110px">Attestation</th>
+            <th>Decision</th>
+            <th style="width:120px">&nbsp;</th>
+          </tr>
+        </thead>
+        <tbody id="rows"><tr><td colspan="6" class="skel"></td></tr></tbody>
       </table>
-    </div>
-    <div style="margin-top:48px" id="invariant">
-      <div class="eyebrow">The invariant</div>
-      <h3>One burn, exactly one mint &mdash; read from both chains</h3>
-      <p class="note" style="margin-bottom:16px">
-        Every burn in the window is paired with a mint the destination chain itself reported, and the
-        value that arrived is measured against the value that left, less the fee the message carries.
-      </p>
-      <div class="counters" id="inv-counters">
+
+      <div id="receipt" class="hidden" style="margin-top:24px"></div>
+    </section>
+
+    <section id="invariant">
+      <div class="eyebrow">Invariant</div>
+      <div class="counters">
         <div><div class="v" id="i-paired">&middot;</div><div class="k">paired</div></div>
         <div><div class="v" id="i-stranded">&middot;</div><div class="k">stranded</div></div>
         <div><div class="v" id="i-inflight">&middot;</div><div class="k">in flight</div></div>
         <div><div class="v" id="i-unwatched">&middot;</div><div class="k">unwatched</div></div>
       </div>
-      <div class="row" style="margin-bottom:16px">
-        <button class="btn outline sm" id="btn-invariant">Run the invariant</button>
+      <div class="row" style="justify-content:space-between;margin-bottom:16px">
+        <button class="btn outline sm" id="btn-invariant">Run</button>
         <span class="note" id="inv-summary">not run yet</span>
       </div>
       <div id="inv-broken"></div>
@@ -160,20 +141,24 @@
           <th style="width:120px">Attestation</th><th style="width:130px">Verdict</th><th>Value</th></tr></thead>
         <tbody id="inv-rows"><tr><td colspan="5" class="dim">run it to read the window</td></tr></tbody>
       </table>
-      <div style="margin-top:28px">
-        <div class="eyebrow">Scheduled passes</div>
-        <p class="note" style="margin-bottom:12px">
-          The watcher runs the same pass on an interval and journals each one, so a transfer that could
-          move and has not becomes a record instead of an observation nobody happened to make. It exits
-          non-zero on a broken pass, and it never spends.
-        </p>
-        <table>
-          <thead><tr><th style="width:200px">When</th><th style="width:120px">Window</th>
-            <th>What it found</th></tr></thead>
-          <tbody id="inv-passes"><tr><td colspan="3" class="dim">no pass has been journaled yet</td></tr></tbody>
-        </table>
-      </div>
-    </div>
+
+      <div class="eyebrow" style="margin-top:40px">Scheduled passes</div>
+      <table>
+        <thead><tr><th style="width:200px">When</th><th style="width:120px">Window</th>
+          <th>Found</th></tr></thead>
+        <tbody id="inv-passes"><tr><td colspan="3" class="dim">nothing journaled yet</td></tr></tbody>
+      </table>
+    </section>
+
+    <section id="ledger">
+      <div class="eyebrow">Receipts</div>
+      <table>
+        <thead><tr><th style="width:190px">Transfer</th><th style="width:240px">Decision</th>
+          <th>Destination transaction</th></tr></thead>
+        <tbody id="ledger-rows"><tr><td colspan="3" class="skel"></td></tr></tbody>
+      </table>
+    </section>
+
   </main>
 
 </div>
