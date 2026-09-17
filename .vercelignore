@@ -1,0 +1,17 @@
+# What the deployment needs is either committed or listed in vercel.json's
+# includeFiles. These are the things it must never upload: local environments,
+# history, caches, the test suite, and every file that could hold a key.
+.venv/
+.venv*/
+.git/
+.gitignore
+.vercel/
+__pycache__/
+**/__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+tests/
+*.log
+artifacts/*.log
