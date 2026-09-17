@@ -12,7 +12,7 @@ the log, and the destination's answer is one simulation away.
 from __future__ import annotations
 
 from . import classifier, protocol
-from .config import CHAIN_IDS, TRANSMITTERS, transmitter
+from .config import CHAIN_IDS, TRANSMITTERS, supports, transmitter
 from .keeperhub import KeeperHub
 from .rail import RECEIVE_ABI
 from .rpc import Rpc
@@ -43,7 +43,9 @@ def decode_message_sent(data: str) -> str | None:
 
 def scan(rpc: Rpc, source_domain: int, blocks: int, deployment: str = "v2") -> list:
     """Every message the protocol announced in the last `blocks` blocks."""
-    address = TRANSMITTERS[deployment][source_domain]
+    address = TRANSMITTERS[deployment].get(source_domain)
+    if address is None:
+        return []
     head = rpc.block_number()
     from_block = max(1, head - blocks)
     logs = rpc.get_logs(address, [], from_block, head)
@@ -91,7 +93,8 @@ def state_of_transfer(kh: KeeperHub, attestation, env: dict, transfer: dict,
     record["parsed"] = parsed
 
     preflight = None
-    watched = parsed.get("destination_domain") in CHAIN_IDS if parsed else False
+    watched = bool(parsed) and supports(env, parsed.get("destination_domain")) \
+        and parsed.get("destination_domain") in CHAIN_IDS
     if watched and att.get("state") == "final":
         destination = parsed["destination_domain"]
         status, body = kh.simulate(CHAIN_IDS[destination], transmitter(env, destination),
@@ -105,8 +108,10 @@ def state_of_transfer(kh: KeeperHub, attestation, env: dict, transfer: dict,
         "destination_domain": (parsed or transfer).get("destination_domain"),
         "burn_tx": transfer["burn_tx"],
     }
+    destination = parsed.get("destination_domain") if parsed else transfer.get("destination_domain")
     observed = {"attestation": att, "message": parsed, "preflight": preflight,
-                "executing_wallet": wallet, "disagreements": record.get("disagreements") or []}
+                "executing_wallet": wallet, "disagreements": record.get("disagreements") or [],
+                "transmitter_address": transmitter(env, destination) if destination is not None else None}
     record["decision"] = classifier.decide(request, observed)
     record["finished"] = bool(preflight and not preflight.get("ok")
                               and preflight.get("already_delivered"))

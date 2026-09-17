@@ -21,9 +21,11 @@ ALREADY_DELIVERED_MARKERS = (
     "message already received",
 )
 
-# The destinations this rail watches. A transfer to anywhere else is refused by
-# name rather than attempted: an unwatched chain has no transmitter to call.
-WATCHED_DOMAINS = (0, 6)
+# The destinations this rail watches: every testnet the execution layer can
+# deliver to and the protocol is deployed on. A transfer to anywhere else is
+# refused by name rather than attempted, because an unwatched chain has no
+# transmitter to call.
+WATCHED_DOMAINS = (0, 2, 3, 6, 7)
 
 COMPLETE = "complete"
 DEFER = "defer"
@@ -96,16 +98,27 @@ def decide(request: dict, observed: dict) -> dict:
         return {"action": REFUSE, "reason": "AMOUNT_MISMATCH",
                 "detail": f"requested {expect['amount']} does not match the message's {message['amount']}"}
 
-    caller = message["destination_caller"]
-    wallet = (observed.get("executing_wallet") or "").lower()
-    if caller.lower() not in ("0x" + "0" * 40, wallet):
-        return {"action": REFUSE, "reason": "CALLER_RESTRICTED",
-                "detail": f"the message names {caller} as its only caller; this wallet may not deliver it"}
-
+    # Whether this rail can reach the destination at all precedes whether this
+    # wallet may call it: an unreachable chain has no answer to the second
+    # question, and a receipt that names the wrong fault teaches the wrong thing.
     if request.get("destination_domain") not in WATCHED_DOMAINS:
         return {"action": REFUSE, "reason": "UNSUPPORTED_DOMAIN",
                 "detail": (f"the message travels to domain {request.get('destination_domain')}, "
                            "which this rail does not watch")}
+
+    # Only a *recorded* absence is evidence. Callers that never looked must not
+    # have their transfers refused on a fact nobody observed.
+    if "transmitter_address" in observed and observed["transmitter_address"] is None:
+        return {"action": REFUSE, "reason": "DEPLOYMENT_ABSENT",
+                "detail": (f"this deployment is not on the destination chain for domain "
+                           f"{request.get('destination_domain')}, so there is nothing to deliver "
+                           "the message to")}
+
+    caller = message.get("destination_caller")
+    wallet = (observed.get("executing_wallet") or "").lower()
+    if caller and message.get("has_destination_caller", True) and caller.lower() not in ("0x" + "0" * 40, wallet):
+        return {"action": REFUSE, "reason": "CALLER_RESTRICTED",
+                "detail": f"the message names {caller} as its only caller; this wallet may not deliver it"}
 
     check = observed.get("transmitter_check")
     if check and not check.get("matches"):

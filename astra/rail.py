@@ -87,6 +87,9 @@ class Rail:
         reads the answer rather than assuming it.
         """
         address = transmitter(self.env, domain)
+        if address is None:
+            return {"address": None, "http": None, "reported_domain": None, "matches": False,
+                    "detail": "this deployment is not present on the destination chain"}
         status, body = self.kh.read(CHAIN_IDS[domain], address, "localDomain", LOCAL_DOMAIN_ABI)
         reported = None
         if isinstance(body, dict):
@@ -109,6 +112,9 @@ class Rail:
         """
         nonce = message.get("nonce")
         address = transmitter(self.env, domain)
+        if address is None:
+            return {"nonce": nonce, "used": None,
+                    "detail": "this deployment is not present on the destination chain"}
         if not nonce:
             return {"nonce": None, "used": None, "detail": "the message carries no nonce to ask about"}
         status, body = self.kh.read(CHAIN_IDS[domain], address, "usedNonces", USED_NONCES_ABI,
@@ -124,7 +130,9 @@ class Rail:
                 "detail": "read from the destination contract" if used is not None
                 else "the destination did not answer for this nonce"}
 
-    def preflight(self, destination_domain: int, attestation: dict) -> dict:
+    def preflight(self, destination_domain: int, attestation: dict):
+        if transmitter(self.env, destination_domain) is None:
+            return None
         status, body = self.kh.simulate(
             CHAIN_IDS[destination_domain], transmitter(self.env, destination_domain),
             "receiveMessage", RECEIVE_ABI,
@@ -140,9 +148,11 @@ class Rail:
         observed = self.observe(request, max_wait=max_wait, interval=interval, on_wait=on_wait)
         destination_domain = request["destination_domain"]
 
+        observed["transmitter_address"] = transmitter(self.env, destination_domain)
         observed["transmitter_check"] = self.verify_transmitter(destination_domain)
         preflight = None
-        if observed["attestation"].get("state") == "final" and observed.get("message"):
+        if (observed["attestation"].get("state") == "final" and observed.get("message")
+                and observed["transmitter_address"] is not None):
             observed["destination_record"] = self.destination_record(destination_domain,
                                                                      observed["message"])
             preflight = self.preflight(destination_domain, observed["attestation"])
@@ -155,7 +165,7 @@ class Rail:
                                   "the delivery; nothing was broadcast because this is a read"}
 
         execution = None
-        if decision["action"] == classifier.COMPLETE and not dry_run:
+        if decision["action"] == classifier.COMPLETE and not dry_run and observed["transmitter_address"]:
             message = observed["message"]
             execution = self.kh.execute(
                 CHAIN_IDS[destination_domain], transmitter(self.env, destination_domain),
@@ -172,6 +182,7 @@ class Rail:
                 "attestation_status": observed["attestation"].get("status"),
                 "message": observed.get("message"),
                 "message_error": observed.get("message_error"),
+                "transmitter_address": observed["transmitter_address"],
                 "transmitter_check": observed["transmitter_check"],
                 "preflight": preflight,
                 "destination_record": observed.get("destination_record"),
