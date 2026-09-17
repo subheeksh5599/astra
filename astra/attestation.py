@@ -18,6 +18,10 @@ import urllib.request
 UA = "Mozilla/5.0 (X11; Linux x86_64) Chrome/124"
 
 
+#: States that mean the answer is not ready yet, not that there is no transfer.
+RETRY_STATES = ("pending", "not_found")
+
+
 class Attestation:
     def __init__(self, base: str, version: str = "v2", timeout: int = 45):
         self.base = base.rstrip("/")
@@ -59,14 +63,25 @@ class Attestation:
 
     def await_final(self, source_domain: int, tx_hash: str, max_wait: int, interval: int = 20,
                     on_wait=None) -> dict:
+        """Wait for an answer that is worth acting on.
+
+        Two states mean "ask again", not "no": pending, and not_found. The service
+        indexes a transfer a little after the source chain accepts it, so a transfer
+        made thirty seconds ago answers not_found for a while -- and refusing on
+        that would refuse precisely the transfer the caller just made. The state is
+        still what gets returned if the budget runs out, so nothing is hidden: the
+        rail just does not mistake "not yet" for "never".
+        """
         deadline = time.time() + max_wait
-        last = {"state": "pending"}
+        last: dict = {"state": "not_found"}
+        attempts = 0
         while True:
             last = self.by_transaction(source_domain, tx_hash)
-            if last["state"] != "pending":
+            attempts += 1
+            if last["state"] not in RETRY_STATES:
                 return last
             if on_wait:
-                on_wait(last)
+                on_wait(last, attempts, max(0, int(deadline - time.time())))
             if time.time() >= deadline:
                 return last
             time.sleep(interval)
