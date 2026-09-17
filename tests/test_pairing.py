@@ -143,7 +143,7 @@ def test_the_block_rate_is_measured_not_assumed():
 def test_an_absent_transfer_is_re_checked_by_its_own_topic():
     """Absent from a window is not absent from the chain."""
     reader = ScriptedRpc(logs=[{"transactionHash": "0xabc"}], head=500_000)
-    found = pairing.received_by_nonce(stub, 3, "v2", f"6:{12345}", blocks=50_000)
+    found = pairing.received_by_nonce(reader, 3, "v2", f"6:{12345}", blocks=50_000)
     assert found == ["0xabc"]
     asked = reader.asked[0]
     assert asked["topics"][0] == pairing.RECEIVE_TOPIC
@@ -154,10 +154,10 @@ def test_an_absent_transfer_is_re_checked_by_its_own_topic():
 
 def test_a_key_that_is_not_a_transfer_key_is_answered_with_nothing():
     reader = ScriptedRpc()
-    assert pairing.received_by_nonce(stub, 3, "v2", "not-a-key", blocks=100) == []
+    assert pairing.received_by_nonce(reader, 3, "v2", "not-a-key", blocks=100) == []
     assert reader.asked == []
 
 
 def test_a_destination_the_deployment_is_not_on_is_answered_with_nothing():
     reader = ScriptedRpc()
-    assert pairing.received_by_nonce(stub, 3, "v1", "6:1", blocks=100) == []
+    assert pairing.received_by_nonce(reader, 3, "v1", "6:1", blocks=100) == []
