@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASTRA: one burn, exactly one mint</title>
+<meta name="description" content="A cross-chain transfer leaves one chain and arrives on another, unless it does not. ASTRA watches both ends, finishes what is in flight, and refuses, by name, what may not move.">
+<link rel="stylesheet" href="astra.css">
+</head>
+<body>
+
+<header class="bar">
+  <div class="wrap bar-in">
+    <a class="mark" href="/"><i id="mark-dot"></i><span>ASTRA</span></a>
+    <span class="mono dim" style="font-size:11.5px">cross-chain delivery rail</span>
+    <span class="spacer"></span>
+    <span class="chip" id="chip-wallet"><span class="dot"></span>executor: <b>reading</b></span>
+    <span class="chip" id="chip-chains"><span class="dot"></span><b>chains</b></span>
+    <span class="chip" id="chip-inflight">in flight: <b>&middot;</b></span>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="kicker">the gap</div>
+    <h1>A transfer can leave one chain<br>and never arrive on the other.</h1>
+    <p class="lede">
+      The tokens are burned on the source chain. The destination has not minted them, and it will not,
+      until somebody hands it the signed attestation. Until then the money is in flight: not lost, not
+      spendable, and invisible unless someone is watching both ends.
+    </p>
+    <div class="row" style="margin-top:22px">
+      <a class="btn primary" href="/app">Open the control surface</a>
+      <a class="btn ghost" href="#refusals">See the refusals</a>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="kicker">the rail</div>
+    <div class="invariant">
+      <span class="mono">invariant</span>
+      <div>
+        <h3>One burn, exactly one mint.</h3>
+        <p style="margin-bottom:8px" class="dim">
+          For every transfer the source chain announced, the destination chain received it once, or it
+          has not received it yet, and there is no third possibility. ASTRA reads both ends and proves
+          the pair from the chains themselves. It keeps no ledger of its own that could disagree with
+          them.
+        </p>
+        <span class="mono dim" style="font-size:12px">prove it: <code>scripts/prove_pairing.py</code>, which exits non-zero the moment a burn has no mint</span>
+      </div>
+    </div>
+
+    <div class="grid g3" style="margin-top:26px">
+      <div>
+        <h3>Observe</h3>
+        <p class="dim">The source chain's own log stream says which transfers exist. The destination's
+        own answer says which ones arrived. No indexer is asked what is pending.</p>
+      </div>
+      <div>
+        <h3>Defer or deliver</h3>
+        <p class="dim">An attestation that is not signed yet is not an error, so the rail waits and says
+        so. An attestation that is signed is handed to the destination contract, which decides whether
+        the transfer may complete.</p>
+      </div>
+      <div>
+        <h3>Refuse by name</h3>
+        <p class="dim">Every refusal carries the reason code and the evidence that produced it, taken
+        from the chain or from the destination's own revert, never from a guess.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="refusals">
+  <div class="wrap">
+    <div class="kicker">when money may not move</div>
+    <h2>The refusal is the product.</h2>
+    <table>
+      <thead><tr><th style="width:230px">Reason</th><th>What it means</th><th style="width:150px">Read from</th></tr></thead>
+      <tbody>
+        <tr><td class="reason">ALREADY_DELIVERED</td><td class="why">The destination received this transfer already. A second delivery would spend gas to fail, or worse, double-send under a local nonce bookkeeping system.</td><td class="mono">destination revert</td></tr>
+        <tr><td class="reason">CALLER_RESTRICTED</td><td class="why">The message names a single address allowed to complete it. If that is not the executor, completion is not ours to attempt, and the rail names who can.</td><td class="mono">message field</td></tr>
+        <tr><td class="reason">ATTESTATION_PENDING</td><td class="why">The source chain has not finalised, so no attestation is signed. Nothing is wrong; it is early. The rail waits.</td><td class="mono">attestation service</td></tr>
+        <tr><td class="reason">RECIPIENT_MISMATCH</td><td class="why">The transfer being asked about is not the transfer in the message: a different recipient, amount, or token. A request is not evidence.</td><td class="mono">message body</td></tr>
+        <tr><td class="reason">ROUTE_MISMATCH</td><td class="why">The message travels between domains other than the ones the caller named.</td><td class="mono">message header</td></tr>
+        <tr><td class="reason">MESSAGE_INCONSISTENT</td><td class="why">Our decode of the message and the attestation service's decode disagree. A decision taken on a disagreement is a decision about a transfer nobody has described correctly, so the rail stops.</td><td class="mono">two decodes</td></tr>
+        <tr><td class="reason">UNSUPPORTED_DOMAIN</td><td class="why">The transfer goes to a chain this rail does not watch, and an unwatched chain has no contract to call.</td><td class="mono">rail config</td></tr>
+        <tr><td class="reason">WRONG_TRANSMITTER</td><td class="why">The contract about to be called reports a different chain domain than the message's destination. The call would be aimed at the wrong contract.</td><td class="mono">on-chain read</td></tr>
+        <tr><td class="reason">PREFLIGHT_REVERT</td><td class="why">The destination would reject the delivery for some other reason. The rail carries that reason rather than replacing it.</td><td class="mono">destination simulation</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="kicker">how it executes</div>
+    <div class="grid g2">
+      <div>
+        <h2>Nothing here signs with a key of its own</h2>
+        <p class="dim">
+          The rail holds no wallet. Every state-changing call goes through an execution layer that
+          simulates first, reports whether the call would revert, and only then broadcasts, with an
+          idempotency key derived from the transfer itself. The rail reads the destination's verdict
+          out of that simulation before anything is spent.
+        </p>
+      </div>
+      <div>
+        <h2>The payer side stays in your wallet</h2>
+        <p class="dim">
+          Creating a transfer is your transaction: you approve and you burn, from your own address, and
+          the message names you as the recipient. The rail's job starts the moment your transfer is in
+          flight and stops when the destination has it.
+        </p>
+      </div>
+    </div>
+    <div class="code" style="margin-top:20px">python3 scripts/astra_open_transfer.py --amount 1
+python3 scripts/astra_inflight.py --blocks 5000
+python3 scripts/astra_complete.py --burn-tx 0x... --source 6 --destination 0 --wait 300
+python3 scripts/prove_pairing.py</div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="kicker">live, on testnet</div>
+    <div class="states" style="margin-bottom:18px">
+      <span><i class="s-transit"></i> delivered</span>
+      <span><i class="s-waiting"></i> waiting on the attestation</span>
+      <span><i class="s-refused"></i> refused, with a reason</span>
+    </div>
+    <div id="evidence"><div class="skel" style="height:56px"></div></div>
+    <p class="note" style="margin-top:14px">
+      These are read live from this deployment's receipts when the page loads. Nothing on this page is
+      illustrative: if the list is empty, the receipts folder is empty.
+    </p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap row">
+    <span>&copy; ASTRA</span>
+    <a href="/app">control surface</a>
+    <a id="link-repo" href="https://github.com/subheeksh5599/astra">source</a>
+    <span class="mono dim" id="foot-config">reading configuration</span>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+<script>Astra.landing();</script>
+</body>
+</html>
