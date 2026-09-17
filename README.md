@@ -17,6 +17,20 @@ what may not move.
 
 ---
 
+## Live
+
+**https://astra-rail.vercel.app** — the same surface, hosted, reading the same five testnets.
+
+It is read-only by design and says so on the page: a hosted bundle holds no key, so nothing there
+signs a burn. Value still moves through it — the rail finishes transfers that are in flight, including
+ones somebody else made — and creating a transfer there is signed in the visitor's own wallet. The
+receipts below were written by local runs and by the hosted instance, and the page shows both.
+
+| Through the deployment | |
+|---|---|
+| A transfer opened locally, finished by the hosted rail | burn [`0x969353ce…`](https://sepolia.basescan.org/tx/0x969353cef2a024279464103f3cd804ed77559997ec7daf729edd606fd7b35f6f) → mint [`0x01aebb10…`](https://sepolia.etherscan.io/tx/0x01aebb103acd93a992e6f0744f7d2bad9a4584e54e7fcb487fb00e56d312a6eb) |
+| Its mint measured from the token's own transfer event | 0.049994 of 0.049994 USDC, 20 seconds after the request |
+
 ## Live status
 
 Everything below was produced by this repository against public testnets. Links are to the chains
@@ -180,6 +194,8 @@ source chain, and the test suite pins each layout against two real transfers.
     astra/rpc.py             a read-only JSON-RPC client
     scripts/                 the payer side, discovery, completion, the invariant, the watcher
     service/                 the HTTP surface and the browser control surface
+    api/index.py             the hosted entry point: the same surface, read-only, no key
+    vercel.json              the deployment: one function for every route, 60s, bundle includes
     tests/                   64 tests, including the captured messages this project produced
 
 ## Run it
@@ -205,6 +221,22 @@ uv venv .venv && uv pip install --python .venv/bin/python pytest   # 64 tests
 - `artifacts/watch/` — the journal of scheduled passes
 - `artifacts/spike-burn.json`, `artifacts/spike-burn-v2.json` — the raw attestations and executions
 - `tests/fixtures/captured.json` — messages captured from the transfers above, pinned by the tests
+
+## Deploying it
+
+The repository ships the deployment. `api/index.py` is the hosted entry point: it sets the instance
+read-only, points receipts at a writable directory, and hands every route to the same service the
+local run uses, so a bug found locally is a bug here. `vercel.json` sends everything to that function
+and includes the package, the service and the committed artifacts in the bundle.
+
+    vercel link --project astra
+    printf '%s' "$KH_API_KEY" | vercel env add KH_API_KEY production
+    vercel deploy --prod --yes
+
+Three environment variables are all it needs: the execution layer's key, the attestation base, and
+`ASTRA_READ_ONLY=1`. No paying key is set there, which is why the page tells a visitor to sign the
+burn in their own wallet — and why an endpoint anyone can reach can spend the executor's gas only
+six times in ten minutes.
 
 ## Limitations and roadmap
 

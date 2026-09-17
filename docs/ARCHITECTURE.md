@@ -112,6 +112,22 @@ The browser pages are static files served by the same process: a landing page an
 where a person connects a wallet, opens a transfer with their own signature, watches it in flight, and
 finishes it through the rail.
 
+## Hosted, read-only, and honest about it
+
+`api/index.py` is the deployed entry point. Three things differ from a local run, and the page says
+all three rather than letting a visitor find out:
+
+    read-only       no paying key is configured, so nothing on the instance signs a burn. The rail
+                    still finishes transfers through the execution layer, and creating one is signed
+                    in the visitor's own wallet.
+    writable /tmp   a hosted bundle cannot be written to, so a decision made there is recorded under
+                    /tmp and served beside the receipts committed to the repository.
+    bounded spend   an endpoint anyone can reach broadcasts at most six transfers in ten minutes.
+
+Everything else is the same code path: the collection, the invariant, the refusal taxonomy, the
+receipts. The window is still a span of time, so a hosted instance reads the same hour on every chain
+as a local one does.
+
 ## Two signers, kept apart
 
 Creating a transfer and finishing one are different transactions with different
