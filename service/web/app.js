@@ -285,3 +285,87 @@ async function loadLedger() {
   }
 }
 
+/* --- the payer side, signed in the browser ---------------------------- */
+
+async function connectWallet() {
+  clearError();
+  if (!window.ethereum) {
+    showError("No browser wallet found. Creating a transfer needs a wallet that can sign; the rail's own side does not.");
+    return;
+  }
+  try {
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const accounts = await provider.send("eth_requestAccounts", []);
+    const network = await provider.getNetwork();
+    ASTRAA.signer = await provider.getSigner();
+    ASTRAA.address = accounts[0];
+    text(el("wallet-state"), `${short(ASTRAA.address, 8, 6)} on chain ${network.chainId}`);
+    el("btn-open").disabled = false;
+  } catch (err) {
+    showError(`wallet refused: ${err.message}`);
+  }
+}
+
+async function openTransfer() {
+  clearError();
+  const cfg = ASTRAA.config;
+  const sourceDomain = 6;
+  const source = cfg.chains[sourceDomain] || cfg.chains[cfg.watched_domains[0]];
+  const destinationDomain = Number(el("payer-destination").value);
+  const amountText = el("payer-amount").value.trim();
+  const caller = el("payer-caller").value.trim();
+  const amount = BigInt(Math.round(Number(amountText) * 1e6));
+  if (!amount || amount <= 0n) { showError("amount must be greater than zero"); return; }
+
+  const provider = new ethers.BrowserProvider(window.ethereum);
+  const network = await provider.getNetwork();
+  if (Number(network.chainId) !== source.chain_id) {
+    showError(`switch your wallet to chain ${source.chain_id} (${source.name}) to create the transfer`);
+    return;
+  }
+  const signer = await provider.getSigner();
+  const usdc = new ethers.Contract(source.usdc, [
+    "function approve(address spender, uint256 amount) returns (bool)",
+    "function allowance(address owner, address spender) view returns (uint256)",
+  ], signer);
+  const messengerAbi = cfg.deployment === "v1"
+    ? ["function depositForBurn(uint256 amount, uint32 destinationDomain, bytes32 mintRecipient, address burnToken)"]
+    : ["function depositForBurn(uint256 amount, uint32 destinationDomain, bytes32 mintRecipient, address burnToken, bytes32 destinationCaller, uint256 maxFee, uint32 minFinalityThreshold)"];
+  const messenger = new ethers.Contract(source.messenger, messengerAbi, signer);
+
+  el("btn-open").disabled = true;
+  text(el("open-state"), "approving\u2026");
+  try {
+    const allowance = await usdc.allowance(ASTRAA.address, source.messenger);
+    if (allowance < amount) {
+      const approveTx = await usdc.approve(source.messenger, amount);
+      text(el("open-state"), `approval sent ${short(approveTx.hash, 12, 6)}\u2026 waiting`);
+      await approveTx.wait();
+    }
+    const recipient32 = ethers.zeroPadValue(ASTRAA.address, 32);
+    const caller32 = caller ? ethers.zeroPadValue(caller, 32) : ethers.ZeroHash;
+    text(el("open-state"), "burning on the source chain\u2026");
+    const burnTx = cfg.deployment === "v1"
+      ? await messenger.depositForBurn(amount, destinationDomain, recipient32, source.usdc)
+      : await messenger.depositForBurn(amount, destinationDomain, recipient32, source.usdc,
+                                       caller32, amount / 1000n, 1000);
+    text(el("open-state"), `transfer opened ${short(burnTx.hash, 12, 6)}\u2026 waiting for the source chain`);
+    await burnTx.wait();
+    text(el("open-state"), `in flight: ${burnTx.hash}`);
+    const link = el("open-link");
+    link.href = explorerLink(source, burnTx.hash);
+    link.textContent = "see the burn";
+    link.classList.remove("hidden");
+    await refresh();
+  } catch (err) {
+    showError(`could not open the transfer: ${err.message}`);
+    text(el("open-state"), "not opened");
+  }
+  el("btn-open").disabled = false;
+}
+
+function explorerLink(chain, hash) {
+  const base = chain.chain_id === 84532 ? "https://sepolia.basescan.org"
+    : chain.chain_id === 11155111 ? "https://sepolia.etherscan.io" : "";
+  return base ? `${base}/tx/${hash}` : hash;
+}
