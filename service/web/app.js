@@ -283,7 +283,7 @@ function renderEvidence(receipts) {
   text(el("product-count"),
     receipts.length ? `${receipts.length} decisions recorded, ${settled} moved value` : "no decisions recorded yet");
   if (!receipts.length) {
-    host.innerHTML = `<p class="note">No receipts on this deployment yet. The rail writes one every time it decides, including when it refuses.</p>`;
+    host.innerHTML = `<p class="note">No receipts yet.</p>`;
     return;
   }
   host.innerHTML = `
@@ -404,7 +404,7 @@ function renderRows(rows) {
   text(el("c-refused"), String(counts.refuse));
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="6" class="dim">Nothing is in flight in this window. Every transfer the source chain announced in it has already arrived.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="dim">Nothing in flight in this window.</td></tr>`;
     return;
   }
   tbody.innerHTML = rows.map((row) => {
