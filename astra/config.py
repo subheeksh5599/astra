@@ -105,7 +105,7 @@ def rpc_url(env: dict, domain: int) -> str:
     same chain, so a rail watching two chains reports one chain's transfers
     under both domains. Each domain names its own endpoint or takes the default.
     """
-    return env.get(f"RPC_DOMAIN_{domain}") or env.get("RPC_URL") or DEFAULT_RPC[domain]
+    return env.get(f"RPC_DOMAIN_{domain}") or DEFAULT_RPC[domain]
 
 
 def keeperhub_key(env: dict) -> str:
