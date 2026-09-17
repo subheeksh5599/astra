@@ -120,6 +120,19 @@ The refusal is the product. Every one carries a reason code and the evidence tha
 | `PREFLIGHT_REVERT` | the destination would reject the delivery for another reason | the destination's simulation |
 | `UNREADABLE_MESSAGE` | the message body could not be decoded, so nothing is attempted | our decoder |
 
+## Doing a transfer
+
+The control surface does both halves, and both are real transactions:
+
+- **From the key this machine holds.** The panel reports what that address holds on each chain and
+  where, offers only the chains it can actually pay on, and signs the approval and the burn itself. With
+  `Burn and finish`, the same call then waits for the source chain to finalise, hands the signed
+  attestation to the destination through the execution layer, and shows the burn link, the mint link and
+  the receipt — one burn and one mint, reported separately because they have different signers.
+- **Or in your own wallet.** The same burn, signed by a browser wallet instead.
+
+Either way the rail is looking at a transfer it did not create, which is the only interesting case.
+
 ## How it executes
 
 The rail holds no key and signs nothing itself. Every state-changing call goes through an execution
@@ -159,6 +172,7 @@ source chain, and the test suite pins each layout against two real transfers.
     astra/rail.py            one pass over one transfer: observe, decide, act, record
     astra/inflight.py        discovery: the source log stream, the destination's verdict
     astra/pairing.py         the invariant: a verdict per transfer, and the three ways it breaks
+    astra/payer.py           the paying side: approve, burn, and nothing else
     astra/rpc.py             a read-only JSON-RPC client
     scripts/                 the payer side, discovery, completion, the invariant, the watcher
     service/                 the HTTP surface and the browser control surface
@@ -168,7 +182,7 @@ source chain, and the test suite pins each layout against two real transfers.
 
 ```bash
 cp .env.example .env          # fill in the executor key and the payer wallet
-uv venv .venv && uv pip install --python .venv/bin/python pytest
+uv venv .venv && uv pip install --python .venv/bin/python pytest   # 64 tests
 .venv/bin/python -m pytest tests -q
 
 .venv/bin/python scripts/astra_inflight.py --blocks 4000

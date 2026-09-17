@@ -98,11 +98,27 @@ destination's record of the nonce.
 | `GET /api/inflight?blocks&limit` | the transfers in flight across every watched domain, newest first |
 | `POST /api/complete` | run one pass over one transfer and return the receipt |
 | `GET /api/inspect?burn_tx&source_domain&destination_domain` | the same pass with `dry_run`: the decision and the evidence, and nothing broadcast |
+| `GET /api/payer` | who this machine signs for and what that address holds on each watched chain — asked before a transfer is offered, so a person is told where their value is |
+| `POST /api/open` | create a transfer from the key this machine holds, with `finish: true` to wait for the attestation and hand it over in the same call. Returns the steps as they happened, both transactions, and both links |
 | `GET /api/receipts`, `GET /api/receipt/<name>` | the receipts as written |
 
 The browser pages are static files served by the same process: a landing page and a control surface
 where a person connects a wallet, opens a transfer with their own signature, watches it in flight, and
 finishes it through the rail.
+
+## Two signers, kept apart
+
+Creating a transfer and finishing one are different transactions with different
+signers, and the receipt never blurs them:
+
+    payer side   approve + burn on the source chain, signed by the payer's key
+                 (astra/payer.py; used by the script and by the control surface)
+    rail side    receiveMessage on the destination, broadcast by the execution
+                 layer, signed by nobody this project holds
+
+The rail holds no key. The payer side holds exactly one, and only to make transfers
+that the rail then has to be correct about: a transfer the rail did not create, does
+not own and cannot remember.
 
 ## Testing
 
