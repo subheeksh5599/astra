@@ -69,6 +69,12 @@ attestation with nothing received (stranded), the same nonce received more than 
 is short of the burn by more than the fee the message itself carries (measured from the token's own
 transfer event in the minting transaction).
 
+The window is a span of time, not a number of blocks: each chain's block rate is measured (a window is
+the same hour on every chain, where the same block count would be four hours on one of them and five
+minutes on another). A transfer that is absent from the window is asked about again by its own indexed
+topic over a much wider range before anything is called stranded — a delivered transfer older than the
+window is a delivery, not stuck value.
+
 `scripts/astra_watch.py` runs that pass on an interval and journals each one, so a transfer able to
 move and not moving becomes a record rather than an observation someone happened to make. It does not
 spend: finishing stays an explicit act.

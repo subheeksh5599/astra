@@ -66,8 +66,17 @@ approximating; the codes below are the honest edges of that.
 - **The value check compares the mint to the burn less the fee the message carries.** It is measured
   from the token's own transfer event in the minting transaction. When that transaction cannot be read,
   the receipt says `null` rather than calling it broken: an unmeasured value is not a mismatch.
-- **Everything is windowed.** The "received twice" count and the value check cover the block range that
-  was read. That is evidence about that window, not a global uniqueness proof.
+- **Everything is windowed, in time rather than blocks.** A window is a span of time, and each chain's
+  block rate is measured so the same span is read on every chain — the same 1,200 blocks is four hours on
+  one of these chains and five minutes on another, and reading "the same number of blocks" everywhere is
+  reading different amounts of history.
+- **A key that is absent from the window is re-checked before anything is called stranded.** The
+  destination is asked about that one nonce directly, by its indexed topic, over a range wide enough that
+  a delivery older than the window cannot hide behind it — and the widest range a public endpoint will
+  answer is the ceiling on that. Before this, the module called a delivered transfer stranded: the mint
+  was real, it was simply older than the window that was read. A false "stuck value" is the worst thing
+  this module could say, so it now asks twice.
+- **That is still evidence about the window that was read**, not a global uniqueness proof.
 - **A simulation is the destination's answer, not a proof of the future.** It is evaluated against the
   state at simulation time. Between simulating and broadcasting, the destination can change; the
   destination contract is the final authority, and its revert is what the receipt then records.
