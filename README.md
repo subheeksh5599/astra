@@ -30,12 +30,15 @@ themselves, not to this project.
 | **It finished too, through the same rail** | Ethereum Sepolia | [`0xa1aecdf9…8e209d`](https://sepolia.etherscan.io/tx/0xa1aecdf992c02913491df02c36b6d3291a20c6d68b03feb0f545e7c4978e209d) |
 | 0.05 USDC opened on the fast threshold, left in flight | Base Sepolia | [`0x9a616524…9ce5da`](https://sepolia.basescan.org/tx/0x9a616524a0a707c3a0cb7347e0ca7bb186bf72acc7db64cd040cf25a829ce5da) |
 | **Finished by the rail, and the mint measured** | Ethereum Sepolia | [`0x09144b02…5baf752`](https://sepolia.etherscan.io/tx/0x09144b02b95fcb419a81feed42432fe9a9fcfd9d2e4152ea3c346e4095baf752) |
+| 0.05 USDC opened once more, after the rail was widened to five chains | Base Sepolia | [`0x27e417c4…fc6168`](https://sepolia.basescan.org/tx/0x27e417c44a724686ee48f0b9a5817ad844536f29e8e09adc9ab9c0402afc6168) |
+| **Finished by the rail on the same path: 0.049994 minted of 0.050000 burned** | Ethereum Sepolia | [`0xcb430dae…fb28b9`](https://sepolia.etherscan.io/tx/0xcb430daeb90c12aedd639c4463cf5d951abfcd5d49680bf32d84a93e6afb28b9) |
 | A transfer whose message names another caller, left undelivered on purpose | Base Sepolia | [`0xd517d29c…38d793`](https://sepolia.basescan.org/tx/0xd517d29c6466b55d63abf2b717f647ca847cb19ae3959c2cfaa0d3537e38d793) |
 | Testnet gas sent to the wallet that executes | Ethereum Sepolia | [`0xc2a660c4…8a44db`](https://sepolia.etherscan.io/tx/0xc2a660c4290550050d784bcfa195988d41fa64361cf03912148ccbdb408a44db) |
 
-The last delivery settles to the protocol's own arithmetic: 0.050000 USDC burned, a 0.000006 fee for
-the fast threshold, 0.049994 minted — and the rail reads the minted figure out of the token's own
-transfer event rather than assuming it.
+Every delivery settles to the protocol's own arithmetic: 0.050000 USDC burned, a 0.000006 fee for the
+fast threshold, 0.049994 minted — and the rail reads the minted figure out of the token's own transfer
+event rather than assuming it, so `prove_pairing.py` reports the pair as `minted 0.049994 of 0.049994`
+for each one.
 
 Refusals proved against the live destination, each with the destination's own words as evidence:
 
