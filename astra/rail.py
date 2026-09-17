@@ -180,3 +180,18 @@ class Rail:
         }
         return receipt
 
+    # -- receipts ---------------------------------------------------------
+    @staticmethod
+    def write_receipt(receipt: dict) -> str:
+        """Write one receipt per decision, never one file per transfer.
+
+        A refusal is evidence too, and it must not overwrite the receipt of the
+        delivery that made the refusal correct: the pair of them is the story.
+        """
+        folder = os.path.join(ROOT, "artifacts", "receipts")
+        os.makedirs(folder, exist_ok=True)
+        name = str(receipt["transfer_id"]).replace(":", "-").replace("0x", "")[:24]
+        path = os.path.join(folder, f"{name}.json")
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(receipt, fh, indent=2)
+        return path
