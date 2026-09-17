@@ -134,7 +134,8 @@ class Rail:
         return verdict
 
     # -- the pass ---------------------------------------------------------
-    def run(self, request: dict, max_wait: int = 0, interval: int = 15, on_wait=None) -> dict:
+    def run(self, request: dict, max_wait: int = 0, interval: int = 15, on_wait=None,
+            dry_run: bool = False) -> dict:
         started = time.time()
         observed = self.observe(request, max_wait=max_wait, interval=interval, on_wait=on_wait)
         destination_domain = request["destination_domain"]
@@ -148,9 +149,13 @@ class Rail:
         observed["preflight"] = preflight
 
         decision = classifier.decide(request, observed)
+        if dry_run and decision["action"] == classifier.COMPLETE:
+            decision = {"action": "complete", "reason": "READY_DRY_RUN",
+                        "detail": "attestation final, message matches the request, destination accepts "
+                                  "the delivery; nothing was broadcast because this is a read"}
 
         execution = None
-        if decision["action"] == classifier.COMPLETE:
+        if decision["action"] == classifier.COMPLETE and not dry_run:
             message = observed["message"]
             execution = self.kh.execute(
                 CHAIN_IDS[destination_domain], transmitter(self.env, destination_domain),
@@ -173,6 +178,7 @@ class Rail:
                 "executing_wallet": observed.get("executing_wallet"),
             },
             "decision": decision,
+            "dry_run": dry_run,
             "execution": execution,
             "transaction_hash": self.kh.transaction_hash(execution) if execution else None,
             "transaction_link": self.kh.transaction_link(execution) if execution else None,

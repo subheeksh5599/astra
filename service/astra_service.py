@@ -117,6 +117,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(public_config(env))
         if path == "/api/inflight":
             return self.inflight(query, env)
+        if path == "/api/inspect":
+            return self.inspect(query, env)
         if path == "/api/receipts":
             return self.receipts()
         if path.startswith("/api/receipt/"):
@@ -148,6 +150,27 @@ class Handler(BaseHTTPRequestHandler):
         with _SCAN_LOCK:
             _SCAN_CACHE[key] = {"rows": rows, "at": time.time()}
         return self.send_json({"rows": rows, "blocks": blocks, "age_seconds": 0.0, "cached": False})
+
+    def inspect(self, query, env):
+        """Read one transfer, decide, and broadcast nothing.
+
+        The landing page needs an answer about a transfer without moving money,
+        so the same pass runs with the broadcast suppressed. The receipt says so.
+        """
+        burn_tx = (query.get("burn_tx") or [""])[0]
+        if not burn_tx.startswith("0x") or len(burn_tx) != 66:
+            return self.send_json({"error": "burn_tx must be a 32-byte transaction hash"}, 400)
+        request = {
+            "source_domain": int((query.get("source_domain") or ["6"])[0]),
+            "destination_domain": int((query.get("destination_domain") or ["0"])[0]),
+            "burn_tx": burn_tx,
+        }
+        try:
+            rail = Rail(env)
+            receipt = rail.run(request, dry_run=True)
+        except Exception as exc:  # noqa: BLE001
+            return self.send_json({"error": str(exc)[:300]}, 502)
+        return self.send_json(receipt)
 
     def receipts(self):
         folder = os.path.join(ROOT, "artifacts", "receipts")
