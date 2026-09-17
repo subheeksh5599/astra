@@ -1,0 +1,68 @@
+{
+  "transfer_id": "6:0x78d3613c7d387fd03d50d24cc8a5c7707d582beb0ea23d505a6ba20cd1645161",
+  "request": {
+    "source_domain": 6,
+    "destination_domain": 0,
+    "burn_tx": "0xd517d29c6466b55d63abf2b717f647ca847cb19ae3959c2cfaa0d3537e38d793"
+  },
+  "observed": {
+    "attestation_state": "final",
+    "attestation_status": "complete",
+    "message": {
+      "layout": "extended",
+      "version": 1,
+      "source_domain": 6,
+      "destination_domain": 0,
+      "nonce": "0x78d3613c7d387fd03d50d24cc8a5c7707d582beb0ea23d505a6ba20cd1645161",
+      "sender": "0x8fe6b999dc680ccfdd5bf7eb0974218be2542daa",
+      "recipient": "0x8fe6b999dc680ccfdd5bf7eb0974218be2542daa",
+      "destination_caller": "0x617b0e8d15c3a48ddf2ec70ab17bf7cc7dbf3046",
+      "body_version": 1,
+      "burn_token": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+      "mint_recipient": "0x3991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad9",
+      "amount": 1000000,
+      "message_sender": "0x3991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad9",
+      "min_finality_threshold": 1000,
+      "finality_threshold_executed": 1000,
+      "max_fee": 1000,
+      "fee_executed": 130,
+      "expiration_block": 11731163,
+      "hook_data": "0x"
+    },
+    "message_error": null,
+    "transmitter_check": {
+      "address": "0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275",
+      "http": 200,
+      "reported_domain": 0,
+      "matches": true
+    },
+    "preflight": {
+      "ok": false,
+      "already_delivered": false,
+      "reason": "Error(Invalid caller for message)   Error(Invalid caller for message)",
+      "raw": {
+        "success": false,
+        "status": "simulated",
+        "from": "0x1776d4d751d97c85845bf54e6ce364cec62d4bbf",
+        "to": "0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275",
+        "value": "0",
+        "failureKind": "revert",
+        "wouldRevert": true,
+        "revertReason": "Error(Invalid caller for message)",
+        "error": "Error(Invalid caller for message)",
+        "originalError": "execution reverted: \"Invalid caller for message\" (action=\"call\", data=\"0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001a496e76616c69642063616c6c657220666f72206d657373616765000000000000\", reason=\"Invalid caller for message\", transaction={ \"data\": \"0x57ecfd28000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000001e0000000000000000000000000000000000000000000000000000000000000017800000001000000060000000078d3613c7d387fd03d50d24cc8a5c7707d582beb0ea23d505a6ba20cd16451610000000000000000000000008fe6b999dc680ccfdd5bf7eb0974218be2542daa0000000000000000000000008fe6b999dc680ccfdd5bf7eb0974218be2542daa000000000000000000000000617b0e8d15c3a48ddf2ec70ab17bf7cc7dbf3046000003e8000003e800000001000000000000000000000000036cbd53842c5426634e7929541ec2318f3dcf7e0000000000000000000000003991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad900000000000000000000000000000000000000000000000000000000000f42400000000000000000000000003991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad900000000000000000000000000000000000000000000000000000000000003e800000000000000000000000000000000000000000000000000000000000000820000000000000000000000000000000000000000000000000000000000b300db0000000000000000000000000000000000000000000000000000000000000000000000000000008278dd224c0585dd8b14549a62e4fb5de33eee9adce91eafb14d788533eaadd4ac13b245f78d68e281c24612a2babcb658a78c0c9f4761aa2ed263910517e4f1f81b28327a3053038bee2db97eb6cdef637c6175dbc7e3a60faf56d70784b46c0a016dfa5f404a85deab317e171e296bd9977bc0177e327dfbac66e65c017162a8ac1c000000000000000000000000000000000000000000000000000000000000\", \"from\": \"0x1776D4D751d97c85845bF54e6CE364CEc62D4bBf\", \"to\": \"0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275\" }, invocation=null, revert={ \"args\": [ \"Invalid caller for message\" ], \"name\": \"Error\", \"signature\": \"Error(string)\" }, code=CALL_EXCEPTION, version=6.17.0)"
+      },
+      "http": 400
+    },
+    "executing_wallet": "0x1776D4D751d97c85845bF54e6CE364CEc62D4bBf"
+  },
+  "decision": {
+    "action": "refuse",
+    "reason": "CALLER_RESTRICTED",
+    "detail": "the message names 0x617b0e8d15c3a48ddf2ec70ab17bf7cc7dbf3046 as its only caller; this wallet may not deliver it"
+  },
+  "execution": null,
+  "transaction_hash": null,
+  "transaction_link": null,
+  "seconds": 1.8
+}

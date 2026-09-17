@@ -1,0 +1,75 @@
+{
+  "transfer_id": "6:0x1fe5312960d98a21c655f1c003a1562f04a285887414723e4832ebceb1d54392",
+  "request": {
+    "source_domain": 6,
+    "destination_domain": 0,
+    "burn_tx": "0x6c7fa66b54ba1608f144d72b403ce4a3d1d07bb4da82ed27c14f3dbfca65d108"
+  },
+  "observed": {
+    "attestation_state": "final",
+    "attestation_status": "complete",
+    "message": {
+      "layout": "extended",
+      "version": 1,
+      "source_domain": 6,
+      "destination_domain": 0,
+      "nonce": "0x1fe5312960d98a21c655f1c003a1562f04a285887414723e4832ebceb1d54392",
+      "sender": "0x8fe6b999dc680ccfdd5bf7eb0974218be2542daa",
+      "recipient": "0x8fe6b999dc680ccfdd5bf7eb0974218be2542daa",
+      "destination_caller": "0x0000000000000000000000000000000000000000",
+      "body_version": 1,
+      "burn_token": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+      "mint_recipient": "0x3991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad9",
+      "amount": 1000000,
+      "message_sender": "0x3991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad9",
+      "min_finality_threshold": 1000,
+      "finality_threshold_executed": 1000,
+      "max_fee": 1000,
+      "fee_executed": 130,
+      "expiration_block": 11731151,
+      "hook_data": "0x"
+    },
+    "message_error": null,
+    "transmitter_check": {
+      "address": "0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275",
+      "http": 200,
+      "reported_domain": 0,
+      "matches": true
+    },
+    "preflight": {
+      "ok": false,
+      "already_delivered": true,
+      "reason": "Error(Nonce already used)   Error(Nonce already used)",
+      "raw": {
+        "success": false,
+        "status": "simulated",
+        "from": "0x1776d4d751d97c85845bf54e6ce364cec62d4bbf",
+        "to": "0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275",
+        "value": "0",
+        "failureKind": "revert",
+        "wouldRevert": true,
+        "revertReason": "Error(Nonce already used)",
+        "error": "Error(Nonce already used)",
+        "originalError": "execution reverted: \"Nonce already used\" (action=\"call\", data=\"0x08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000124e6f6e636520616c726561647920757365640000000000000000000000000000\", reason=\"Nonce already used\", transaction={ \"data\": \"0x57ecfd28000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000001e000000000000000000000000000000000000000000000000000000000000001780000000100000006000000001fe5312960d98a21c655f1c003a1562f04a285887414723e4832ebceb1d543920000000000000000000000008fe6b999dc680ccfdd5bf7eb0974218be2542daa0000000000000000000000008fe6b999dc680ccfdd5bf7eb0974218be2542daa0000000000000000000000000000000000000000000000000000000000000000000003e8000003e800000001000000000000000000000000036cbd53842c5426634e7929541ec2318f3dcf7e0000000000000000000000003991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad900000000000000000000000000000000000000000000000000000000000f42400000000000000000000000003991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad900000000000000000000000000000000000000000000000000000000000003e800000000000000000000000000000000000000000000000000000000000000820000000000000000000000000000000000000000000000000000000000b300cf000000000000000000000000000000000000000000000000000000000000000000000000000000825a57f1220f8946ceaaf16e78a0c6d3eaea1dfe7ec991e12b447c36288073538634bf676efb61ab9c9840a171a1bd2d3b545cb76cf03760033b2950aae312f9f41b848e30712f8d70b1480c0bfdfa5a2c24e4229ee63dfae731b1cec036a7f708b84a2362a181e0b25d7e1ae32b1c9f0db86f2c8627455b0a383e35cc631e44c36f1c000000000000000000000000000000000000000000000000000000000000\", \"from\": \"0x1776D4D751d97c85845bF54e6CE364CEc62D4bBf\", \"to\": \"0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275\" }, invocation=null, revert={ \"args\": [ \"Nonce already used\" ], \"name\": \"Error\", \"signature\": \"Error(string)\" }, code=CALL_EXCEPTION, version=6.17.0)"
+      },
+      "http": 400
+    },
+    "destination_record": {
+      "nonce": "0x1fe5312960d98a21c655f1c003a1562f04a285887414723e4832ebceb1d54392",
+      "used": true,
+      "http": 200,
+      "detail": "read from the destination contract"
+    },
+    "executing_wallet": "0x1776D4D751d97c85845bF54e6CE364CEc62D4bBf"
+  },
+  "decision": {
+    "action": "refuse",
+    "reason": "ALREADY_DELIVERED",
+    "detail": "the destination's own record already holds this transfer; a second delivery is not possible",
+    "evidence": "the destination contract reports nonce 0x1fe5312960d98a21c655f1c003a1562f04a285887414723e4832ebceb1d54392 as used"
+  },
+  "execution": null,
+  "transaction_hash": null,
+  "transaction_link": null,
+  "seconds": 2.2
+}

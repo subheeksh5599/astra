@@ -1,0 +1,31 @@
+{
+  "transfer_id": "6:0x1111111111111111111111111111111111111111111111111111111111111111",
+  "request": {
+    "source_domain": 6,
+    "destination_domain": 0,
+    "burn_tx": "0x1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "observed": {
+    "attestation_state": "not_found",
+    "attestation_status": null,
+    "message": null,
+    "message_error": null,
+    "transmitter_check": {
+      "address": "0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275",
+      "http": 200,
+      "reported_domain": 0,
+      "matches": true
+    },
+    "preflight": null,
+    "executing_wallet": "0x1776D4D751d97c85845bF54e6CE364CEc62D4bBf"
+  },
+  "decision": {
+    "action": "refuse",
+    "reason": "NOT_FOUND",
+    "detail": "the source transaction carries no transfer: nothing to deliver"
+  },
+  "execution": null,
+  "transaction_hash": null,
+  "transaction_link": null,
+  "seconds": 1.2
+}

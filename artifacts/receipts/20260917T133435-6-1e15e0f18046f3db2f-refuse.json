@@ -1,0 +1,32 @@
+{
+  "transfer_id": "6:0x1e15e0f18046f3db2f8f4cd9bfd43f72b3f569b6948748c54697898a5293bcd3",
+  "request": {
+    "source_domain": 6,
+    "destination_domain": 0,
+    "burn_tx": "0x1e15e0f18046f3db2f8f4cd9bfd43f72b3f569b6948748c54697898a5293bcd3"
+  },
+  "observed": {
+    "attestation_state": "final",
+    "attestation_status": null,
+    "message": null,
+    "message_error": "message is 248 bytes; this rail decodes the 376-byte layout (the later deployment). A shorter layout is read through the attestation service's own decode instead of being guessed at.",
+    "transmitter_check": {
+      "address": "0x7865fAfC2db2093669d92c0F33AeEF291086BEFD",
+      "http": 200,
+      "reported_domain": 0,
+      "matches": true
+    },
+    "preflight": null,
+    "destination_record": null,
+    "executing_wallet": "0x1776D4D751d97c85845bF54e6CE364CEc62D4bBf"
+  },
+  "decision": {
+    "action": "refuse",
+    "reason": "UNREADABLE_MESSAGE",
+    "detail": "the attestation is signed but the message could not be decoded"
+  },
+  "execution": null,
+  "transaction_hash": null,
+  "transaction_link": null,
+  "seconds": 1.2
+}
