@@ -143,3 +143,22 @@ uv venv .venv && uv pip install --python .venv/bin/python pytest
 .venv/bin/python service/astra_service.py --port 8099           # then open http://127.0.0.1:8099
 ```
 
+## Evidence in the repository
+
+- `artifacts/receipts/` — one receipt per decision, including the refusals, each carrying the evidence
+- `artifacts/pairing.json` — the invariant's answer for a window of transfers
+- `artifacts/spike-burn.json`, `artifacts/spike-burn-v2.json` — the raw attestations and executions
+- `tests/fixtures/captured.json` — messages captured from the transfers above, pinned by the tests
+
+## Limitations and roadmap
+
+Read [docs/LIMITATIONS.md](docs/LIMITATIONS.md) before trusting this with anything. The short version:
+it is a testnet rail, it watches two domains, and it decodes one of the two live message layouts. What
+it does not do, it refuses by name rather than approximating.
+
+Roadmap: decode the older layout as well, watch more domains, and turn the pairing proof into a
+scheduled check whose failure is a receipt of its own.
+
+---
+
+MIT. See [LICENSE](LICENSE).
