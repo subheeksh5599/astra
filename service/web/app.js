@@ -102,6 +102,7 @@ Astra = {
       renderEvidence(receipts.receipts || []);
     } catch (err) {
       el("evidence").innerHTML = `<div class="err">receipts unavailable: ${err.message}</div>`;
+      offlineBanner(err);
     }
     bindTrace();
   },
@@ -124,7 +125,11 @@ Astra = {
       const faucet = el("faucet");
       if (cfg.faucet) { faucet.href = cfg.faucet; faucet.classList.remove("hidden"); }
     } catch (err) {
+      // The most likely reason a page that reads chains looks empty is that the
+      // service behind it is not running. Say that, with the command, instead of
+      // leaving someone to guess why every table is blank.
       showError(`configuration unavailable: ${err.message}`);
+      offlineBanner(err);
     }
     await refresh();
     await loadLedger();
@@ -358,6 +363,20 @@ async function loadLedger() {
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="3" class="dim">receipts unavailable: ${err.message}</td></tr>`;
   }
+}
+
+/* A page that reads live chains cannot be a static file. When there is nothing
+   behind it, say so plainly and say what to run. */
+function offlineBanner(err) {
+  const banner = document.createElement("div");
+  banner.className = "err";
+  banner.style.margin = "0 0 20px";
+  banner.innerHTML = `<b>The rail is not running behind this page.</b> Every table here is read from
+    chains through it, so nothing can be shown until it is up.<br>
+    <span class="mono">.venv/bin/python service/astra_service.py --port 8099</span><br>
+    <span class="dim">then open http://127.0.0.1:8099/app — ${err.message}</span>`;
+  const main = document.querySelector(".wrap");
+  if (main) main.parentNode.insertBefore(banner, main);
 }
 
 /* --- the invariant ---------------------------------------------------- */
