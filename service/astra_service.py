@@ -27,7 +27,7 @@ from urllib.parse import parse_qs, urlparse
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from astra import inflight  # noqa: E402
+from astra import inflight, payer  # noqa: E402
 from astra.attestation import Attestation  # noqa: E402
 from astra.config import (CHAIN_IDS, DOMAIN_NAMES, MESSENGERS, USDC, attestation_base,  # noqa: E402
                           attestation_version, deployment, load_env, rpc_url, supports,
@@ -52,6 +52,20 @@ _SCAN_LOCK = threading.Lock()
 _SCAN_CACHE: dict = {}
 
 
+EXPLORERS = {
+    0: "https://sepolia.etherscan.io",
+    2: "https://sepolia-optimism.etherscan.io",
+    3: "https://sepolia.arbiscan.io",
+    6: "https://sepolia.basescan.org",
+    7: "https://amoy.polygonscan.com",
+}
+
+
+def explorer_link(domain, tx_hash: str) -> str | None:
+    base = EXPLORERS.get(domain)
+    return f"{base}/tx/{tx_hash}" if base and tx_hash else None
+
+
 def public_config(env: dict) -> dict:
     """Everything the page needs, taken from the environment, never invented."""
     name = deployment(env)
@@ -66,6 +80,7 @@ def public_config(env: dict) -> dict:
             "usdc": USDC[domain],
             "messenger": MESSENGERS[name][domain],
             "transmitter": transmitter(env, domain),
+            "explorer": EXPLORERS.get(domain, ""),
         }
     return {
         "deployment": name,
@@ -130,6 +145,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.inflight(query, env)
         if path == "/api/inspect":
             return self.inspect(query, env)
+        if path == "/api/payer":
+            return self.payer_status(env)
         if path == "/api/receipts":
             return self.receipts()
         if path.startswith("/api/receipt/"):
@@ -140,6 +157,8 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path.rstrip("/") == "/api/complete":
             return self.complete(self.read_body())
+        if parsed.path.rstrip("/") == "/api/open":
+            return self.open_transfer(self.read_body())
         return self.send_json({"error": "unknown route", "path": parsed.path}, 404)
 
     # -- handlers ---------------------------------------------------------
@@ -182,6 +201,79 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as exc:  # noqa: BLE001
             return self.send_json({"error": str(exc)[:300]}, 502)
         return self.send_json(receipt)
+
+    def payer_status(self, env):
+        """Who can pay from this machine, and what that key holds where.
+
+        Nothing signs here. The control surface asks this before offering to create
+        a transfer, so a person is told where their value is instead of discovering
+        it at signing time.
+        """
+        try:
+            who = payer.address(env)
+            rows = payer.balances(env)
+        except payer.PayerUnavailable as exc:
+            return self.send_json({"configured": False, "detail": str(exc)})
+        except Exception as exc:  # noqa: BLE001
+            return self.send_json({"configured": True, "detail": str(exc)[:300]}, 502)
+        return self.send_json({"configured": True, "address": who, "chains": rows})
+
+    def open_transfer(self, body):
+        """Create a transfer from the key this machine holds, and optionally finish it.
+
+        The burn is the payer's own transaction; the finishing half is the rail's
+        and goes through the execution layer. Both are reported separately, because
+        they are different transactions with different signers and a receipt that
+        blurred them would be the most misleading thing this project could emit.
+        """
+        env = load_env()
+        body = body or {}
+        steps: list = []
+
+        def step(message: str) -> None:
+            steps.append({"at": time.strftime("%H:%M:%SZ", time.gmtime()), "step": str(message)[:200]})
+
+        try:
+            amount = float(body.get("amount") or 0)
+            source = int(body.get("source_domain", 6))
+            destination = int(body.get("destination_domain", 0))
+        except (TypeError, ValueError):
+            return self.send_json({"error": "amount, source_domain and destination_domain must be numbers"}, 400)
+        caller = (body.get("caller") or "").strip() or None
+        deployment_name = deployment(env)
+
+        try:
+            transfer = payer.open_transfer(env, amount, source, destination, caller=caller,
+                                           deployment=deployment_name, on_step=step)
+        except (payer.PayerUnavailable, ValueError, RuntimeError) as exc:
+            return self.send_json({"error": str(exc)[:300], "steps": steps}, 400)
+        except Exception as exc:  # noqa: BLE001
+            return self.send_json({"error": str(exc)[:300], "steps": steps}, 502)
+
+        result = {
+            "transfer": transfer,
+            "steps": steps,
+            "burn_link": explorer_link(transfer["source_domain"], transfer["burn_tx"]),
+        }
+
+        if body.get("finish"):
+            wait = int(body.get("wait_seconds") or 900)
+            step(f"waiting up to {wait}s for the source chain to finalise")
+            try:
+                rail = Rail(env)
+                receipt = rail.run({"source_domain": source, "destination_domain": destination,
+                                    "burn_tx": transfer["burn_tx"]},
+                                   max_wait=wait, interval=10,
+                                   on_wait=lambda state, reads, left: step(
+                                       f"attestation {state.get('state')} after {reads} reads, {left}s left"))
+                rail.write_receipt(receipt)
+                result["receipt"] = receipt
+                result["mint_link"] = receipt.get("transaction_link")
+                step(f"destination said: {(receipt.get('decision') or {}).get('reason')}")
+            except Exception as exc:  # noqa: BLE001
+                result["finish_error"] = str(exc)[:300]
+                step(f"finishing failed: {str(exc)[:200]}")
+        return self.send_json(result)
 
     def receipts(self):
         folder = os.path.join(ROOT, "artifacts", "receipts")
