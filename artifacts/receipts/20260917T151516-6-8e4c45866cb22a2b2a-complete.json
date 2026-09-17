@@ -1,0 +1,133 @@
+{
+  "transfer_id": "6:0x8e4c45866cb22a2b2aa16bc1a871b733abc89337579ae6fe1addb7ae6d346667",
+  "request": {
+    "source_domain": 6,
+    "destination_domain": 0,
+    "burn_tx": "0xaeda8544d1396dafff797280221dfc1a80456d3068450c76eb2a4d4b70b2cf37"
+  },
+  "observed": {
+    "attestation_state": "final",
+    "attestation_status": "complete",
+    "message": {
+      "layout": "extended",
+      "version": 1,
+      "source_domain": 6,
+      "destination_domain": 0,
+      "nonce": "0x8e4c45866cb22a2b2aa16bc1a871b733abc89337579ae6fe1addb7ae6d346667",
+      "sender": "0x8fe6b999dc680ccfdd5bf7eb0974218be2542daa",
+      "recipient": "0x8fe6b999dc680ccfdd5bf7eb0974218be2542daa",
+      "destination_caller": "0x0000000000000000000000000000000000000000",
+      "has_destination_caller": true,
+      "body_version": 1,
+      "burn_token": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+      "mint_recipient": "0x3991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad9",
+      "amount": 50000,
+      "message_sender": "0x3991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad9",
+      "min_finality_threshold": 1000,
+      "finality_threshold_executed": 1000,
+      "max_fee": 50,
+      "fee_executed": 6,
+      "expiration_block": 11731716,
+      "hook_data": "0x"
+    },
+    "message_error": null,
+    "transmitter_address": "0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275",
+    "transmitter_check": {
+      "address": "0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275",
+      "http": 200,
+      "reported_domain": 0,
+      "matches": true
+    },
+    "preflight": {
+      "ok": true,
+      "already_delivered": false,
+      "reason": null,
+      "raw": {
+        "success": true,
+        "status": "simulated",
+        "from": "0x1776d4d751d97c85845bf54e6ce364cec62d4bbf",
+        "to": "0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275",
+        "value": "0",
+        "gasEstimate": "171253",
+        "simulatedReturnValue": true,
+        "wouldRevert": false
+      },
+      "http": 200
+    },
+    "destination_record": {
+      "nonce": "0x8e4c45866cb22a2b2aa16bc1a871b733abc89337579ae6fe1addb7ae6d346667",
+      "used": false,
+      "http": 200,
+      "detail": "read from the destination contract"
+    },
+    "executing_wallet": "0x1776D4D751d97c85845bF54e6CE364CEc62D4bBf"
+  },
+  "decision": {
+    "action": "complete",
+    "reason": "READY",
+    "detail": "attestation final, message matches the request, destination accepts the delivery"
+  },
+  "dry_run": false,
+  "execution": {
+    "http": 202,
+    "response": {
+      "executionId": "95iljwbtgjh1eohxjwjm4",
+      "status": "completed",
+      "transactionHash": "0xda28cc48df950c06bf1e95fb1bafcae6794a0b0403b9a22c6be101b01126dab1",
+      "transactionLink": "https://sepolia.etherscan.io/tx/0xda28cc48df950c06bf1e95fb1bafcae6794a0b0403b9a22c6be101b01126dab1"
+    },
+    "execution_id": "95iljwbtgjh1eohxjwjm4",
+    "status": {
+      "executionId": "95iljwbtgjh1eohxjwjm4",
+      "status": "completed",
+      "type": "contract-call",
+      "transactionHash": "0xda28cc48df950c06bf1e95fb1bafcae6794a0b0403b9a22c6be101b01126dab1",
+      "transactionLink": "https://sepolia.etherscan.io/tx/0xda28cc48df950c06bf1e95fb1bafcae6794a0b0403b9a22c6be101b01126dab1",
+      "sponsored": true,
+      "receipts": [
+        {
+          "hash": "0xda28cc48df950c06bf1e95fb1bafcae6794a0b0403b9a22c6be101b01126dab1",
+          "chainId": 11155111,
+          "gasUsed": "191458",
+          "verified": true,
+          "verifiedAt": "2026-09-17T15:15:15.945Z",
+          "blockNumber": 11724533,
+          "receiptStatus": "success"
+        }
+      ],
+      "result": {
+        "chainId": 11155111,
+        "gasUsed": "197045113571024",
+        "success": true,
+        "sponsored": true,
+        "executedCall": {
+          "args": {
+            "message": "0x0000000100000006000000008e4c45866cb22a2b2aa16bc1a871b733abc89337579ae6fe1addb7ae6d3466670000000000000000000000008fe6b999dc680ccfdd5bf7eb0974218be2542daa0000000000000000000000008fe6b999dc680ccfdd5bf7eb0974218be2542daa0000000000000000000000000000000000000000000000000000000000000000000003e8000003e800000001000000000000000000000000036cbd53842c5426634e7929541ec2318f3dcf7e0000000000000000000000003991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad9000000000000000000000000000000000000000000000000000000000000c3500000000000000000000000003991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad9000000000000000000000000000000000000000000000000000000000000003200000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000b30304",
+            "attestation": "0xaa0560020bf964da8ca7f736e0ebc51c46a9ed823fb1a1236b15a9d4531119de1ff3a8e4f622f64ef3b945a24e9cff1176f8266dec90e044549e36145827c8b51c299641eaa498ecbfe84797ec3ebab7c3c853ea28c5748c483395c6cc4c7bda1c1017bcfe892c045f514e42e6e69cda95089df2e35e487205ba6d38cf6ea2ad771b"
+          },
+          "reverted": false,
+          "sponsored": true,
+          "topLevelTo": "0x5af5194b4b0909eb978e3cf1e25333852277f07d",
+          "functionName": "receiveMessage",
+          "contractAddress": "0xe737e5cebeeba77efe34d4aa090756590b1ce275",
+          "functionSignature": "receiveMessage(bytes,bytes)"
+        },
+        "gasUsedUnits": "191458",
+        "transactionHash": "0xda28cc48df950c06bf1e95fb1bafcae6794a0b0403b9a22c6be101b01126dab1",
+        "transactionLink": "https://sepolia.etherscan.io/tx/0xda28cc48df950c06bf1e95fb1bafcae6794a0b0403b9a22c6be101b01126dab1",
+        "effectiveGasPrice": "1029181928"
+      },
+      "error": null,
+      "gasUsedWei": "197045113571024",
+      "gasPriceWei": "1029181928",
+      "estimatedCostUsd": null,
+      "retryCount": 0,
+      "network": "11155111",
+      "createdAt": "2026-09-17T15:15:01.654Z",
+      "completedAt": "2026-09-17T15:15:16.087Z"
+    }
+  },
+  "transaction_hash": "0xda28cc48df950c06bf1e95fb1bafcae6794a0b0403b9a22c6be101b01126dab1",
+  "transaction_link": "https://sepolia.etherscan.io/tx/0xda28cc48df950c06bf1e95fb1bafcae6794a0b0403b9a22c6be101b01126dab1",
+  "seconds": 17.1
+}
