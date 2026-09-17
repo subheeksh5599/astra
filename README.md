@@ -9,7 +9,9 @@ ends, finishes what is in flight through an execution layer that holds the keys,
 what may not move.
 
 [![Network](https://img.shields.io/badge/watching-5%20testnets%20%C2%B7%202%20live%20deployments-0052FF?labelColor=0e1013)](astra/config.py)
-[![Tests](https://img.shields.io/badge/tests-64%20passing-2ecc71?labelColor=0e1013)](tests/)
+[![tests](https://github.com/subheeksh5599/astra/actions/workflows/tests.yml/badge.svg)](https://github.com/subheeksh5599/astra/actions/workflows/tests.yml)
+[![Tests](https://img.shields.io/badge/tests-68%20passing-2ecc71?labelColor=0e1013)](tests/)
+[![Live](https://img.shields.io/badge/live-astra--rail.vercel.app-000000?labelColor=0e1013)](https://astra-rail.vercel.app)
 [![Invariant](https://img.shields.io/badge/invariant-executable%20%2B%20quantitative-3f9d8f?labelColor=0e1013)](scripts/prove_pairing.py)
 [![License](https://img.shields.io/badge/license-MIT-yellow?labelColor=0e1013)](LICENSE)
 
@@ -221,6 +223,8 @@ uv venv .venv && uv pip install --python .venv/bin/python pytest   # 64 tests
 - `artifacts/watch/` — the journal of scheduled passes
 - `artifacts/spike-burn.json`, `artifacts/spike-burn-v2.json` — the raw attestations and executions
 - `tests/fixtures/captured.json` — messages captured from the transfers above, pinned by the tests
+- `.github/workflows/tests.yml` — the suite, a check that no key material is tracked, and a check that
+  the package imports with no configuration at all
 
 ## Deploying it
 

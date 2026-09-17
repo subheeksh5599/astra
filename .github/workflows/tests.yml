@@ -1,0 +1,29 @@
+name: tests
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install the test runner
+        run: uv venv .venv && uv pip install --python .venv/bin/python pytest
+      - name: Run the suite
+        run: .venv/bin/python -m pytest tests -q
+      - name: Check that nothing that holds a key is tracked
+        run: |
+          if git ls-files | grep -qE '^\.env$'; then
+            echo "a .env file is tracked"; exit 1
+          fi
+          if git grep -InE '(KH_API_KEY|BUYER_KEY|PAYER_KEY|PRIVATE_KEY)=[A-Za-z0-9_-]{6,}' -- ':!.env.example' ; then
+            echo "a key is committed"; exit 1
+          fi
+          echo "no key material is tracked"
+      - name: Check that the package imports without a configuration file
+        run: .venv/bin/python -c "import astra.pairing, astra.protocol, astra.payer; print('imports clean')"
