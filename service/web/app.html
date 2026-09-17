@@ -6,58 +6,65 @@
 <title>ASTRA: control surface</title>
 <link rel="stylesheet" href="astra.css">
 </head>
-<body class="dash-body">
+<body>
 
-<header class="bar">
-  <div class="wrap bar-in">
-    <a class="mark" href="/"><i></i><span>ASTRA</span></a>
-    <span class="mono dim" style="font-size:11.5px">control surface</span>
+<nav class="nav">
+  <div class="wrap nav-in">
+    <a class="logo" href="/"><i></i><span>ASTRA</span></a>
+    <div class="nav-links">
+      <a href="/">Overview</a>
+      <a href="#collection">Collection</a>
+      <a href="#ledger">Receipts</a>
+    </div>
     <span class="spacer"></span>
-    <span class="chip" id="chip-mode">execution layer</span>
-    <span class="chip"><span class="dot on"></span>both chains watched</span>
-    <button class="btn ghost" id="btn-refresh">Rescan</button>
+    <span class="chip"><span class="dot on"></span><span id="chip-mode">execution layer</span></span>
+    <button class="btn outline sm" id="btn-refresh">Rescan</button>
   </div>
-</header>
+</nav>
 
 <div class="err hidden" id="err"></div>
 
-<div class="dash">
-  <aside class="payer">
-    <div class="kicker">payer side</div>
+<div class="wrap">
+<div class="shell">
+
+  <aside class="side">
+    <div class="eyebrow">Payer side</div>
     <h3>Open a transfer</h3>
-    <p class="note" style="margin-bottom:16px">
+    <p class="note" style="margin-bottom:20px">
       This is your transaction. You approve and you burn on the source chain; the message names your
       address as the recipient. Leave the caller blank to let anyone finish it, or name an address to
       make it theirs alone.
     </p>
 
-    <div class="row" style="margin-bottom:16px">
-      <button class="btn" id="btn-connect">Connect wallet</button>
-      <span class="mono dim" id="wallet-state" style="font-size:12px">not connected</span>
+    <div class="row" style="margin-bottom:20px">
+      <button class="btn primary" id="btn-connect">Connect wallet</button>
+      <span class="dim" id="wallet-state" style="font-size:13px">not connected</span>
     </div>
 
     <div class="field">
-      <label for="payer-amount">amount (USDC)</label>
+      <label for="payer-amount">Amount (USDC)</label>
       <input id="payer-amount" value="1" inputmode="decimal">
     </div>
     <div class="field">
-      <label for="payer-destination">destination chain</label>
+      <label for="payer-destination">Destination chain</label>
       <select id="payer-destination"></select>
     </div>
     <div class="field">
-      <label for="payer-caller">only this address may complete (optional)</label>
-      <input id="payer-caller" placeholder="0x\u2026">
+      <label for="payer-caller">Only this address may complete</label>
+      <input id="payer-caller" placeholder="optional">
     </div>
 
     <button class="btn primary" id="btn-open" disabled>Approve and burn</button>
     <p class="note" id="open-state" style="margin-top:12px">unsigned</p>
-    <a class="btn ghost hidden" id="open-link" target="_blank" rel="noreferrer" style="margin-top:8px">see the burn</a>
-    <a class="hidden btn ghost" id="faucet" target="_blank" rel="noreferrer" style="margin-top:8px">testnet faucet</a>
+    <div class="row" style="margin-top:8px">
+      <a class="btn outline sm hidden" id="open-link" target="_blank" rel="noreferrer">See the burn</a>
+      <a class="btn outline sm hidden" id="faucet" target="_blank" rel="noreferrer">Testnet faucet</a>
+    </div>
 
-    <div style="margin-top:26px;padding-top:20px;border-top:1px solid var(--rule-faint)">
-      <div class="kicker">window</div>
+    <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--mist)">
+      <div class="eyebrow">Window</div>
       <div class="field">
-        <label for="filter-blocks">source blocks to read</label>
+        <label for="filter-blocks">Source blocks to read</label>
         <select id="filter-blocks">
           <option value="1200" selected>1200 (about an hour)</option>
           <option value="4000">4000 (about five hours)</option>
@@ -70,8 +77,8 @@
     </div>
   </aside>
 
-  <main class="collect">
-    <div class="kicker">the collection</div>
+  <main class="main" id="collection">
+    <div class="eyebrow">The collection</div>
     <h2>Transfers in flight</h2>
     <div class="counters">
       <div><div class="v" id="c-inflight">&middot;</div><div class="k">in flight</div></div>
@@ -79,33 +86,41 @@
       <div><div class="v" id="c-waiting">&middot;</div><div class="k">waiting</div></div>
       <div><div class="v" id="c-refused">&middot;</div><div class="k">refused</div></div>
     </div>
-    <p class="note" id="last-scan" style="margin-bottom:16px">not scanned yet</p>
+    <p class="note" id="last-scan" style="margin-bottom:20px">not scanned yet</p>
+
+    <div class="states" style="margin-bottom:16px">
+      <span><i class="ok"></i>deliverable or paired</span>
+      <span><i class="no"></i>refused, money did not move</span>
+      <span><i class="wait"></i>waiting on the attestation</span>
+    </div>
 
     <table>
       <thead>
         <tr>
-          <th style="width:180px">transfer</th>
-          <th style="width:150px">amount</th>
-          <th style="width:150px">destination</th>
-          <th style="width:110px">attestation</th>
-          <th>rail decision</th>
-          <th style="width:120px">&nbsp;</th>
+          <th style="width:180px">Transfer</th>
+          <th style="width:150px">Amount</th>
+          <th style="width:150px">Destination</th>
+          <th style="width:110px">Attestation</th>
+          <th>Rail decision</th>
+          <th style="width:130px">&nbsp;</th>
         </tr>
       </thead>
       <tbody id="rows"><tr><td colspan="6" class="skel"></td></tr></tbody>
     </table>
 
-    <div id="receipt" class="ok hidden" style="margin-top:22px"></div>
+    <div id="receipt" class="hidden" style="margin-top:24px"></div>
 
-    <div style="margin-top:34px">
-      <div class="kicker">receipts</div>
+    <div style="margin-top:48px" id="ledger">
+      <div class="eyebrow">Receipts</div>
       <h3>Every decision, including the ones that moved nothing</h3>
       <table>
-        <thead><tr><th style="width:180px">transfer</th><th style="width:220px">decision</th><th>destination transaction</th></tr></thead>
-        <tbody id="ledger"><tr><td colspan="3" class="skel"></td></tr></tbody>
+        <thead><tr><th style="width:180px">Transfer</th><th style="width:240px">Decision</th><th>Destination transaction</th></tr></thead>
+        <tbody id="ledger-rows"><tr><td colspan="3" class="skel"></td></tr></tbody>
       </table>
     </div>
   </main>
+
+</div>
 </div>
 
 <script src="app.js"></script>

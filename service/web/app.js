@@ -1,7 +1,7 @@
 /* ASTRA browser surface.
-   Everything the page shows comes from the service: configuration, the live
-   in-flight list, the receipts. The only thing this file hardcodes is an
-   approval amount of zero, which is not a value, it is the absence of one. */
+   Everything the page shows comes from the service: the configuration, the
+   live in-flight list, the receipts. Nothing here carries an address, a chain
+   id or a decision of its own. */
 
 const ASTRAA = {
   config: null,
@@ -42,11 +42,13 @@ function fmtAmount(units, decimals = 6) {
   return (Number(units) / 10 ** decimals).toFixed(6).replace(/0+$/, "").replace(/\.$/, ".0");
 }
 
+/* Mint means switched on, ink means the money did not move, neutral is
+   everything the rail is still waiting on. */
 function decisionClass(decision) {
   if (!decision) return "";
-  if (decision.action === "complete") return "t";
-  if (decision.action === "defer") return "w";
-  return "r";
+  if (decision.action === "complete") return "ok";
+  if (decision.action === "defer") return "wait";
+  return "no";
 }
 
 async function loadConfig() {
@@ -56,12 +58,24 @@ async function loadConfig() {
 }
 
 function chainOptions(selected) {
-  const chains = Object.values(ASTRAA.config.chains)
-    .sort((a, b) => a.domain - b.domain);
+  const chains = Object.values(ASTRAA.config.chains).sort((a, b) => a.domain - b.domain);
   return chains.map((chain) => {
     const sel = String(chain.domain) === String(selected) ? " selected" : "";
     return `<option value="${chain.domain}"${sel}>${chain.name} (domain ${chain.domain})</option>`;
   }).join("");
+}
+
+function renderBand() {
+  const host = el("band");
+  if (!host || !ASTRAA.config) return;
+  host.innerHTML = Object.values(ASTRAA.config.chains)
+    .sort((a, b) => a.domain - b.domain)
+    .map((chain) => `
+      <div>
+        <b>${chain.name}</b>
+        <span>domain ${chain.domain} &middot; chain ${chain.chain_id}</span>
+      </div>`).join("")
+    + `<div><b>destination contract</b><span>${short(Object.values(ASTRAA.config.chains)[0].messenger, 12, 6)}</span></div>`;
 }
 
 /* --- landing ---------------------------------------------------------- */
@@ -70,18 +84,15 @@ Astra = {
   async landing() {
     try {
       const cfg = await loadConfig();
-      const wallet = await jget("/api/inflight?blocks=12&limit=1").catch(() => null);
-      text(el("foot-config"),
-        `${cfg.deployment} deployment \u00b7 domains ${cfg.watched_domains.join(", ")} \u00b7 executor via execution layer`);
+      renderBand();
       const chains = Object.values(cfg.chains).length;
-      text(el("chip-chains"), `${chains} chains watched`);
-      if (el("chip-chains").querySelector("b")) {
-        el("chip-chains").querySelector("b").textContent = `${chains} chains watched`;
-        el("chip-chains").querySelector("b").previousSibling.classList.add("on");
+      const chip = el("chip-wallet");
+      if (chip) {
+        chip.querySelector("b").textContent = "via the execution layer";
+        chip.querySelector(".dot").classList.add("on");
       }
-      if (wallet && wallet.rows) {
-        el("chip-inflight").querySelector("b").textContent = String(wallet.rows.length);
-      }
+      text(el("foot-config"),
+        `${cfg.deployment} deployment \u00b7 watching domains ${cfg.watched_domains.join(", ")}`);
     } catch (err) {
       text(el("foot-config"), `configuration unavailable: ${err.message}`);
     }
@@ -91,17 +102,16 @@ Astra = {
     } catch (err) {
       el("evidence").innerHTML = `<div class="err">receipts unavailable: ${err.message}</div>`;
     }
-    const repo = el("link-repo");
-    if (repo && repo.dataset.href) repo.href = repo.dataset.href;
+    bindTrace();
   },
 
   async app() {
     bindApp();
     try {
       const cfg = await loadConfig();
-      el("payer-destination").innerHTML = chainOptions(cfg.chains[6] ? 0 : cfg.watched_domains[0]);
+      el("payer-destination").innerHTML = chainOptions(cfg.watched_domains[0]);
       text(el("cfg-line"),
-        `${cfg.deployment} deployment \u00b7 attestation via ${new URL(cfg.attestation_base).host} \u00b7 watching domains ${cfg.watched_domains.join(", ")}`);
+        `${cfg.deployment} deployment \u00b7 attestation via ${new URL(cfg.attestation_base).host}`);
       const faucet = el("faucet");
       if (cfg.faucet) { faucet.href = cfg.faucet; faucet.classList.remove("hidden"); }
     } catch (err) {
@@ -114,27 +124,70 @@ Astra = {
 
 function renderEvidence(receipts) {
   const host = el("evidence");
+  const settled = receipts.filter((r) => r.transaction_link).length;
+  text(el("product-count"),
+    receipts.length ? `${receipts.length} decisions recorded, ${settled} moved value` : "no decisions recorded yet");
   if (!receipts.length) {
-    host.innerHTML = `<div class="note">No receipts on this deployment yet. The rail writes one every time it decides, including when it refuses.</div>`;
+    host.innerHTML = `<p class="note">No receipts on this deployment yet. The rail writes one every time it decides, including when it refuses.</p>`;
     return;
   }
-  const done = receipts.filter((r) => r.transaction_link);
   host.innerHTML = `
     <table>
-      <thead><tr><th style="width:210px">Transfer</th><th style="width:150px">Decision</th>
+      <thead><tr><th style="width:220px">Transfer</th><th style="width:220px">Decision</th>
       <th>Destination transaction</th></tr></thead>
       <tbody>
-      ${receipts.slice(0, 6).map((r) => `
+      ${receipts.slice(0, 5).map((r) => `
         <tr>
-          <td class="mono">${short(r.transfer_id, 14, 8)}</td>
-          <td><span class="tag ${r.decision && r.decision.action === "refuse" ? "r" : "t"}">${r.decision ? r.decision.reason : "recorded"}</span></td>
-          <td class="mono">${r.transaction_link
-            ? `<a href="${r.transaction_link}" target="_blank" rel="noreferrer">${short(r.transaction_hash, 14, 8)}</a>`
+          <td><span class="mono dim">${short(r.transfer_id, 12, 6)}</span></td>
+          <td><span class="tag ${r.decision && r.decision.action === "refuse" ? "no" : "ok"}">${r.decision ? r.decision.reason : "recorded"}</span></td>
+          <td>${r.transaction_link
+            ? `<a href="${r.transaction_link}" target="_blank" rel="noreferrer" class="mono">${short(r.transaction_hash, 12, 6)}</a>`
             : `<span class="dim">no money moved</span>`}</td>
         </tr>`).join("")}
       </tbody>
-    </table>
-    <p class="note" style="margin-top:12px">${done.length} of ${receipts.length} recorded decisions moved value.</p>`;
+    </table>`;
+}
+
+function bindTrace() {
+  const form = el("trace-form");
+  if (!form) return;
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const value = el("trace-input").value.trim();
+    const out = el("trace-out");
+    if (!/^0x[0-9a-fA-F]{64}$/.test(value)) {
+      text(el("trace-note"), "That is not a transaction hash. A source transaction hash is 32 bytes.");
+      out.classList.add("hidden");
+      return;
+    }
+    text(el("trace-note"), "reading both chains\\u2026");
+    try {
+      const receipt = await jget(`/api/inspect?burn_tx=${encodeURIComponent(value)}`);
+      renderTrace(receipt);
+      text(el("trace-note"), "Nothing was broadcast: this is the rail's read of both chains.");
+    } catch (err) {
+      text(el("trace-note"), `could not read it: ${err.message}`);
+      out.classList.add("hidden");
+    }
+  });
+}
+
+function renderTrace(receipt) {
+  const d = receipt.decision || {};
+  const out = el("trace-out");
+  out.classList.remove("hidden");
+  out.innerHTML = `
+    <div class="row" style="margin-bottom:10px">
+      <span class="tag ${decisionClass(d)}">${d.reason}</span>
+      <span class="mono dim" style="font-size:13px">${receipt.transfer_id}</span>
+    </div>
+    <p style="margin-bottom:14px">${d.detail || ""}</p>
+    <dl class="kv">
+      <dt>Attestation</dt><dd>${(receipt.observed || {}).attestation_state || "\u00b7"}</dd>
+      <dt>Amount</dt><dd>${(receipt.observed || {}).message ? fmtAmount(receipt.observed.message.amount) + " USDC" : "\u00b7"}</dd>
+      <dt>Recipient</dt><dd>${(receipt.observed || {}).message ? receipt.observed.message.mint_recipient : "\u00b7"}</dd>
+      <dt>Evidence</dt><dd>${d.evidence ? String(d.evidence).slice(0, 200) : "seen on chain"}</dd>
+    </dl>`;
 }
 
 /* --- control surface -------------------------------------------------- */
@@ -183,7 +236,9 @@ async function refresh() {
 function renderRows(rows) {
   const tbody = el("rows");
   const counts = { complete: 0, defer: 0, refuse: 0 };
-  rows.forEach((row) => { if (row.decision && counts[row.decision.action] !== undefined) counts[row.decision.action] += 1; });
+  rows.forEach((row) => {
+    if (row.decision && counts[row.decision.action] !== undefined) counts[row.decision.action] += 1;
+  });
   text(el("c-inflight"), String(rows.length));
   text(el("c-ready"), String(counts.complete));
   text(el("c-waiting"), String(counts.defer));
@@ -196,23 +251,28 @@ function renderRows(rows) {
   tbody.innerHTML = rows.map((row) => {
     const d = row.decision || {};
     const canFinish = d.action === "complete";
-    const finishLabel = d.action === "complete" ? "Finish it" : "Try anyway";
     return `
     <tr>
-      <td class="mono">
-        ${short(row.transfer_id, 12, 6)}
+      <td>
+        <span class="mono">${short(row.transfer_id, 12, 6)}</span>
         <div class="why">source block ${row.block}</div>
       </td>
-      <td class="mono">${row.amount === null || row.amount === undefined ? "\u00b7" : fmtAmount(row.amount) + " USDC"}<div class="why">${short(row.mint_recipient, 8, 4)}</div></td>
-      <td class="mono">${row.destination_name}<div class="why">domain ${row.destination_domain}</div></td>
-      <td class="mono">${row.attestation_state}</td>
+      <td>
+        <span class="mono">${row.amount === null || row.amount === undefined ? "\u00b7" : fmtAmount(row.amount) + " USDC"}</span>
+        <div class="why">${short(row.mint_recipient, 8, 4)}</div>
+      </td>
+      <td>
+        <span class="mono">${row.destination_name}</span>
+        <div class="why">domain ${row.destination_domain}</div>
+      </td>
+      <td><span class="mono dim">${row.attestation_state}</span></td>
       <td>
         <span class="tag ${decisionClass(d)}">${d.reason || "unknown"}</span>
         <div class="why">${d.detail || ""}</div>
       </td>
       <td>
-        <button class="btn ${canFinish ? "primary" : "ghost"}" data-burn="${row.burn_tx}"
-          data-source="${row.source_domain}" data-destination="${row.destination_domain}">${finishLabel}</button>
+        <button class="btn ${canFinish ? "primary" : "outline"} sm" data-burn="${row.burn_tx}"
+          data-source="${row.source_domain}" data-destination="${row.destination_domain}">${canFinish ? "Finish it" : "Try anyway"}</button>
       </td>
     </tr>`;
   }).join("");
@@ -249,39 +309,41 @@ function showReceipt(receipt) {
   const box = el("receipt");
   const d = receipt.decision || {};
   box.classList.remove("hidden");
+  box.className = "receipt-card head";
   box.innerHTML = `
-    <div class="kicker">last decision</div>
+    <div class="eyebrow">Last decision</div>
     <div class="row" style="margin-bottom:10px">
       <span class="tag ${decisionClass(d)}">${d.reason}</span>
-      <span class="mono dim" style="font-size:12px">${receipt.transfer_id}</span>
+      <span class="mono dim" style="font-size:13px">${receipt.transfer_id}</span>
     </div>
-    <p style="margin-bottom:12px">${d.detail || ""}</p>
+    <p style="margin-bottom:14px">${d.detail || ""}</p>
     <dl class="kv">
-      <dt>destination tx</dt>
+      <dt>Destination tx</dt>
       <dd>${receipt.transaction_link
-        ? `<a href="${receipt.transaction_link}" target="_blank" rel="noreferrer">${receipt.transaction_hash}</a>`
+        ? `<a href="${receipt.transaction_link}" target="_blank" rel="noreferrer" class="mono">${receipt.transaction_hash}</a>`
         : "none: no money moved"}</dd>
-      <dt>evidence</dt>
+      <dt>Evidence</dt>
       <dd>${d.evidence ? String(d.evidence).slice(0, 220) : "seen on chain"}</dd>
-      <dt>took</dt>
+      <dt>Took</dt>
       <dd>${receipt.seconds}s</dd>
     </dl>`;
 }
 
 async function loadLedger() {
+  const tbody = el("ledger-rows");
   try {
     const body = await jget("/api/receipts");
     const receipts = body.receipts || [];
-    el("ledger").innerHTML = receipts.length ? receipts.map((r) => `
+    tbody.innerHTML = receipts.length ? receipts.map((r) => `
       <tr>
-        <td class="mono">${short(r.transfer_id, 12, 6)}</td>
-        <td><span class="tag ${r.decision && r.decision.action === "refuse" ? "r" : "t"}">${r.decision ? r.decision.reason : ""}</span></td>
-        <td class="mono">${r.transaction_link
-          ? `<a href="${r.transaction_link}" target="_blank" rel="noreferrer">${short(r.transaction_hash, 12, 6)}</a>`
-          : "<span class=\"dim\">no money moved</span>"}</td>
+        <td><span class="mono">${short(r.transfer_id, 12, 6)}</span></td>
+        <td><span class="tag ${r.decision && r.decision.action === "refuse" ? "no" : "ok"}">${r.decision ? r.decision.reason : ""}</span></td>
+        <td>${r.transaction_link
+          ? `<a href="${r.transaction_link}" target="_blank" rel="noreferrer" class="mono">${short(r.transaction_hash, 12, 6)}</a>`
+          : `<span class="dim">no money moved</span>`}</td>
       </tr>`).join("") : `<tr><td colspan="3" class="dim">No decisions recorded yet.</td></tr>`;
   } catch (err) {
-    el("ledger").innerHTML = `<tr><td colspan="3" class="dim">ledger unavailable: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="3" class="dim">receipts unavailable: ${err.message}</td></tr>`;
   }
 }
 
@@ -309,12 +371,11 @@ async function connectWallet() {
 async function openTransfer() {
   clearError();
   const cfg = ASTRAA.config;
-  const sourceDomain = 6;
-  const source = cfg.chains[sourceDomain] || cfg.chains[cfg.watched_domains[0]];
+  const sourceDomain = cfg.watched_domains[0];
+  const source = cfg.chains[sourceDomain];
   const destinationDomain = Number(el("payer-destination").value);
-  const amountText = el("payer-amount").value.trim();
+  const amount = BigInt(Math.round(Number(el("payer-amount").value.trim()) * 1e6));
   const caller = el("payer-caller").value.trim();
-  const amount = BigInt(Math.round(Number(amountText) * 1e6));
   if (!amount || amount <= 0n) { showError("amount must be greater than zero"); return; }
 
   const provider = new ethers.BrowserProvider(window.ethereum);
@@ -354,7 +415,6 @@ async function openTransfer() {
     text(el("open-state"), `in flight: ${burnTx.hash}`);
     const link = el("open-link");
     link.href = explorerLink(source, burnTx.hash);
-    link.textContent = "see the burn";
     link.classList.remove("hidden");
     await refresh();
   } catch (err) {
