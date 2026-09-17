@@ -44,6 +44,9 @@ class Rpc:
     def call_contract(self, to: str, data: str) -> str:
         return self.call("eth_call", [{"to": to, "data": data}, "latest"])
 
+    def transaction_receipt(self, tx_hash: str) -> dict:
+        return self.call("eth_getTransactionReceipt", [tx_hash]) or {}
+
     def balance_of(self, token: str, holder: str) -> int:
         data = "0x70a08231" + "0" * 24 + holder[2:].lower()
         raw = self.call_contract(token, data)
