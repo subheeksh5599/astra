@@ -6,6 +6,7 @@
 const ASTRAA = {
   config: null,
   rows: [],
+  payer: null,
   busy: false,
 };
 
@@ -112,11 +113,12 @@ Astra = {
       // The source defaults to the busiest chain this rail runs on, and the
       // destination to another; both are selectable, because which chain is
       // the source is the payer's business and their wallet's balance decides it.
-      const preferredSource = cfg.chains["6"] ? 6 : cfg.watched_domains[0];
-      const preferredDestination = cfg.watched_domains.find((d) => Number(d) !== Number(preferredSource))
-        ?? cfg.watched_domains[0];
-      el("payer-source").innerHTML = chainOptions(preferredSource);
-      el("payer-destination").innerHTML = chainOptions(preferredDestination);
+      el("payer-source").innerHTML = chainOptions(cfg.watched_domains[0]);
+      // The destination defaults to the chain this rail has delivered to most,
+      // and stays selectable: which chain is the destination is the caller's call.
+      el("payer-destination").innerHTML = chainOptions(
+        cfg.chains["0"] ? 0 : cfg.watched_domains[cfg.watched_domains.length - 1]);
+      await loadPayer();
       text(el("cfg-line"),
         `${cfg.deployment} deployment \u00b7 attestation via ${new URL(cfg.attestation_base).host}`);
       const faucet = el("faucet");
@@ -202,7 +204,9 @@ function renderTrace(receipt) {
 function bindApp() {
   el("btn-refresh").addEventListener("click", refresh);
   el("btn-connect").addEventListener("click", connectWallet);
-  el("btn-open").addEventListener("click", openTransfer);
+  el("btn-open").addEventListener("click", () => openFromServer(false));
+  el("btn-open-finish").addEventListener("click", () => openFromServer(true));
+  el("btn-wallet-open").addEventListener("click", openTransfer);
   el("filter-blocks").addEventListener("change", refresh);
 }
 
@@ -352,6 +356,119 @@ async function loadLedger() {
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="3" class="dim">receipts unavailable: ${err.message}</td></tr>`;
   }
+}
+
+/* --- the payer side, on this machine ---------------------------------- */
+
+/* What the key this machine holds can pay with, and where. Asked before a
+   transfer is offered, so nobody fills a form and finds out at signing time. */
+async function loadPayer() {
+  const box = el("payer-box");
+  try {
+    const payer = await jget("/api/payer");
+    ASTRAA.payer = payer;
+    renderPayer(payer);
+  } catch (err) {
+    box.innerHTML = `<span class="dim">the payer side could not be read: ${err.message}</span>`;
+    el("btn-open").disabled = true;
+    el("btn-open-finish").disabled = true;
+  }
+}
+
+function renderPayer(payer) {
+  const box = el("payer-box");
+  if (!payer.configured) {
+    box.innerHTML = `<div class="brief">No paying key on this machine.<br>
+      <span class="dim">${payer.detail || ""}</span></div>`;
+    el("btn-open").disabled = true;
+    el("btn-open-finish").disabled = true;
+    return;
+  }
+  const chains = (payer.chains || []).filter((c) => c.usdc > 0 || c.native > 0);
+  const payable = (payer.chains || []).filter((c) => c.usdc > 0 && c.native > 0);
+  box.innerHTML = `
+    <div class="brief"><span class="mono">${short(payer.address, 12, 6)}</span>
+      <span class="dim"> pays from this machine</span></div>
+    <table class="mini">
+      <thead><tr><th>chain</th><th>USDC</th><th>gas</th><th></th></tr></thead>
+      <tbody>
+      ${chains.map((c) => `
+        <tr>
+          <td>${c.name}</td>
+          <td class="mono">${fmtAmount(c.usdc)}</td>
+          <td class="mono dim">${c.native ? (c.native / 1e18).toFixed(4) : "0"}</td>
+          <td>${c.usdc > 0 && c.native > 0 ? '<span class="tag ok">can pay here</span>'
+              : '<span class="tag">no</span>'}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>`;
+  if (payable.length) {
+    el("payer-source").innerHTML = chainOptions(payable[0].domain);
+  }
+  const ready = payable.length > 0;
+  el("btn-open").disabled = !ready;
+  el("btn-open-finish").disabled = !ready;
+}
+
+function renderSteps(steps) {
+  const list = el("open-steps");
+  if (!steps || !steps.length) {
+    list.classList.add("hidden");
+    list.innerHTML = "";
+    return;
+  }
+  list.classList.remove("hidden");
+  list.innerHTML = steps.map((entry) => `<li><span class="dim">${entry.at}</span> ${entry.step}</li>`).join("");
+}
+
+/* One click that ends in a real delivery: the burn is signed here, then the rail
+   waits for the source chain to finalise and hands the attestation over. The two
+   transactions are reported separately because they have different signers. */
+async function openFromServer(finish) {
+  clearError();
+  renderSteps([]);
+  el("open-link").classList.add("hidden");
+  el("mint-link").classList.add("hidden");
+  const amount = Number(el("payer-amount").value.trim());
+  const source = Number(el("payer-source").value);
+  const destination = Number(el("payer-destination").value);
+  const caller = el("payer-caller").value.trim();
+  if (!(amount > 0)) { showError("amount must be greater than zero"); return; }
+
+  const buttons = [el("btn-open"), el("btn-open-finish")];
+  buttons.forEach((b) => { b.disabled = true; });
+  const started = Date.now();
+  const label = finish ? "burning, then waiting for the attestation" : "burning";
+  text(el("open-state"), `${label}\u2026`);
+  const ticker = setInterval(() => {
+    text(el("open-state"), `${label}\u2026 ${Math.round((Date.now() - started) / 1000)}s`);
+  }, 1000);
+  try {
+    const out = await jpost("/api/open", {
+      amount, source_domain: source, destination_domain: destination,
+      caller: caller || null, finish, wait_seconds: 900,
+    });
+    renderSteps(out.steps || []);
+    const transfer = out.transfer || {};
+    text(el("open-state"), `burned ${fmtAmount(transfer.amount)} USDC on ${source} \u2192 ${destination}`);
+    const burn = el("open-link");
+    burn.href = out.burn_link || "#";
+    burn.classList.remove("hidden");
+    if (out.receipt) {
+      showReceipt(out.receipt);
+      const mint = el("mint-link");
+      if (out.mint_link) { mint.href = out.mint_link; mint.classList.remove("hidden"); }
+    }
+    if (out.finish_error) showError(`the transfer is in flight, but finishing failed: ${out.finish_error}`);
+    await refresh();
+    await loadLedger();
+    await loadPayer();
+  } catch (err) {
+    showError(`could not open the transfer: ${err.message}`);
+    text(el("open-state"), "nothing sent");
+  }
+  clearInterval(ticker);
+  buttons.forEach((b) => { b.disabled = false; });
 }
 
 /* --- the payer side, signed in the browser ---------------------------- */

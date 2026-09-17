@@ -28,18 +28,15 @@
 <div class="shell">
 
   <aside class="side">
-    <div class="eyebrow">Payer side</div>
-    <h3>Open a transfer</h3>
-    <p class="note" style="margin-bottom:20px">
-      This is your transaction. You approve and you burn on the source chain; the message names your
-      address as the recipient. Leave the caller blank to let anyone finish it, or name an address to
-      make it theirs alone.
+    <div class="eyebrow">Do a transfer</div>
+    <h3>From the key this machine holds</h3>
+    <p class="note" style="margin-bottom:16px">
+      The rail signs nothing. This is the payer side, and it is your key: you approve, you burn, and
+      the message names your address as the recipient. Leave the caller blank to let anyone finish it,
+      or name an address to make it theirs alone.
     </p>
 
-    <div class="row" style="margin-bottom:20px">
-      <button class="btn primary" id="btn-connect">Connect wallet</button>
-      <span class="dim" id="wallet-state" style="font-size:13px">not connected</span>
-    </div>
+    <div class="payer-box" id="payer-box">reading the payer side…</div>
 
     <div class="field">
       <label for="payer-source">Source chain</label>
@@ -58,11 +55,28 @@
       <input id="payer-caller" placeholder="optional">
     </div>
 
-    <button class="btn primary" id="btn-open" disabled>Approve and burn</button>
-    <p class="note" id="open-state" style="margin-top:12px">unsigned</p>
+    <div class="row">
+      <button class="btn primary" id="btn-open">Burn it</button>
+      <button class="btn outline" id="btn-open-finish">Burn and finish</button>
+    </div>
+    <p class="note" id="open-state" style="margin-top:12px">nothing sent yet</p>
+    <ol class="steps hidden" id="open-steps"></ol>
     <div class="row" style="margin-top:8px">
-      <a class="btn outline sm hidden" id="open-link" target="_blank" rel="noreferrer">See the burn</a>
+      <a class="btn outline sm hidden" id="open-link" target="_blank" rel="noreferrer">The burn</a>
+      <a class="btn outline sm hidden" id="mint-link" target="_blank" rel="noreferrer">The mint</a>
       <a class="btn outline sm hidden" id="faucet" target="_blank" rel="noreferrer">Testnet faucet</a>
+    </div>
+
+    <div style="margin-top:28px;padding-top:20px;border-top:1px solid var(--mist)">
+      <div class="eyebrow">Or sign it yourself</div>
+      <p class="note" style="margin-bottom:12px">
+        The same burn, signed in your own wallet instead of the one this machine holds.
+      </p>
+      <div class="row" style="margin-bottom:12px">
+        <button class="btn outline sm" id="btn-connect">Connect wallet</button>
+        <span class="dim" id="wallet-state" style="font-size:13px">not connected</span>
+      </div>
+      <button class="btn outline" id="btn-wallet-open" disabled>Approve and burn in the wallet</button>
     </div>
 
     <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--mist)">
@@ -76,8 +90,6 @@
         </select>
       </div>
       <p class="note" id="cfg-line">reading configuration</p>
-      <p class="note">A scan reads both chains directly, so the first one takes a little while. The
-      result is shared for 30 seconds after that.</p>
     </div>
   </aside>
 
