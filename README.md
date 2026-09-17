@@ -9,7 +9,7 @@ ends, finishes what is in flight through an execution layer that holds the keys,
 what may not move.
 
 [![Network](https://img.shields.io/badge/watching-5%20testnets%20%C2%B7%202%20live%20deployments-0052FF?labelColor=0e1013)](astra/config.py)
-[![Tests](https://img.shields.io/badge/tests-50%20passing-2ecc71?labelColor=0e1013)](tests/)
+[![Tests](https://img.shields.io/badge/tests-64%20passing-2ecc71?labelColor=0e1013)](tests/)
 [![Invariant](https://img.shields.io/badge/invariant-executable%20%2B%20quantitative-3f9d8f?labelColor=0e1013)](scripts/prove_pairing.py)
 [![License](https://img.shields.io/badge/license-MIT-yellow?labelColor=0e1013)](LICENSE)
 
@@ -32,6 +32,8 @@ themselves, not to this project.
 | **Finished by the rail, and the mint measured** | Ethereum Sepolia | [`0x09144b02…5baf752`](https://sepolia.etherscan.io/tx/0x09144b02b95fcb419a81feed42432fe9a9fcfd9d2e4152ea3c346e4095baf752) |
 | 0.05 USDC opened once more, after the rail was widened to five chains | Base Sepolia | [`0x27e417c4…fc6168`](https://sepolia.basescan.org/tx/0x27e417c44a724686ee48f0b9a5817ad844536f29e8e09adc9ab9c0402afc6168) |
 | **Finished by the rail on the same path: 0.049994 minted of 0.050000 burned** | Ethereum Sepolia | [`0xcb430dae…fb28b9`](https://sepolia.etherscan.io/tx/0xcb430daeb90c12aedd639c4463cf5d951abfcd5d49680bf32d84a93e6afb28b9) |
+| A transfer created **from the web page in one click**, no wallet involved | Base Sepolia | [`0x197ea313…fe4406`](https://sepolia.basescan.org/tx/0x197ea31303de2dee21eb3ef31c175914bd508146482d4b5ddf43a98a47fe4406) |
+| **Finished by the same click, 40 seconds later** | Ethereum Sepolia | [`0x158839e5…545546c`](https://sepolia.etherscan.io/tx/0x158839e5f9692ce74fa481e2fb04ea30e1e3c2060a673aeab79513f33545546c) |
 | A transfer whose message names another caller, left undelivered on purpose | Base Sepolia | [`0xd517d29c…38d793`](https://sepolia.basescan.org/tx/0xd517d29c6466b55d63abf2b717f647ca847cb19ae3959c2cfaa0d3537e38d793) |
 | Testnet gas sent to the wallet that executes | Ethereum Sepolia | [`0xc2a660c4…8a44db`](https://sepolia.etherscan.io/tx/0xc2a660c4290550050d784bcfa195988d41fa64361cf03912148ccbdb408a44db) |
 
@@ -93,7 +95,9 @@ The invariant can break in three ways, and all three are checked:
 
 It exits non-zero on any of them, so wiring it to a job makes "money is stuck" a failed job rather
 than a paragraph. `scripts/astra_watch.py` is that job: it runs the same pass on an interval and
-writes one journal entry per pass, and it does not spend anything. Finishing a transfer stays an
+writes one journal entry per pass, and it does not spend anything. The control surface shows the same
+read — counters, each paired row's measured value, the places it is broken, and the journal of
+scheduled passes — so the invariant is visible without a terminal. Finishing a transfer stays an
 explicit act on purpose — a process that moves money unattended is the thing this rail exists to
 replace with something you can ask about.
 
@@ -176,7 +180,7 @@ source chain, and the test suite pins each layout against two real transfers.
     astra/rpc.py             a read-only JSON-RPC client
     scripts/                 the payer side, discovery, completion, the invariant, the watcher
     service/                 the HTTP surface and the browser control surface
-    tests/                   50 tests, including the captured messages this project produced
+    tests/                   64 tests, including the captured messages this project produced
 
 ## Run it
 
