@@ -27,7 +27,7 @@ from urllib.parse import parse_qs, urlparse
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from astra import inflight, payer  # noqa: E402
+from astra import inflight, pairing, payer  # noqa: E402
 from astra.attestation import Attestation  # noqa: E402
 from astra.config import (CHAIN_IDS, DOMAIN_NAMES, MESSENGERS, USDC, attestation_base,  # noqa: E402
                           attestation_version, deployment, load_env, rpc_url, supports,
@@ -147,6 +147,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.inspect(query, env)
         if path == "/api/payer":
             return self.payer_status(env)
+        if path == "/api/pairing":
+            return self.pairing(query)
         if path == "/api/receipts":
             return self.receipts()
         if path.startswith("/api/receipt/"):
@@ -201,6 +203,62 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as exc:  # noqa: BLE001
             return self.send_json({"error": str(exc)[:300]}, 502)
         return self.send_json(receipt)
+
+    def pairing(self, query):
+        """The invariant over a window, and the passes that run it on a schedule.
+
+        The page shows what the collection cannot: whether every burn in the window
+        has exactly one mint, how much value actually arrived, and the journal of
+        scheduled passes. Read-only; nothing here moves anything.
+        """
+        blocks = int((query.get("blocks") or ["2600"])[0])
+        limit = int((query.get("limit") or ["14"])[0])
+        key = ("pairing", blocks, limit)
+        now = time.time()
+        with _SCAN_LOCK:
+            cached = _SCAN_CACHE.get(key)
+            if cached and now - cached["at"] < SCAN_TTL_SECONDS:
+                return self.send_json({**cached["rows"], "cached": True,
+                                       "age_seconds": round(now - cached["at"], 1)})
+        try:
+            result = pairing.collect(blocks=blocks, limit=limit)
+        except Exception as exc:  # noqa: BLE001
+            return self.send_json({"error": str(exc)[:300]}, 502)
+        broken = pairing.broken(result)
+        payload = {
+            "blocks": blocks,
+            "summary": pairing.summarise(result),
+            "rows": result["rows"],
+            "broken": broken,
+            "domains": result["domains"],
+            "passes": self.watch_journal(5),
+            "cached": False,
+            "age_seconds": 0.0,
+        }
+        with _SCAN_LOCK:
+            _SCAN_CACHE[key] = {"rows": payload, "at": time.time()}
+        return self.send_json(payload)
+
+    @staticmethod
+    def watch_journal(limit: int = 5) -> list:
+        """The last few scheduled passes, as the watcher wrote them."""
+        folder = os.path.join(ROOT, "artifacts", "watch")
+        out = []
+        if not os.path.isdir(folder):
+            return out
+        for name in sorted(os.listdir(folder), reverse=True)[:limit]:
+            if not name.endswith(".json"):
+                continue
+            try:
+                with open(os.path.join(folder, name), encoding="utf-8") as fh:
+                    entry = json.load(fh)
+            except (OSError, ValueError):
+                continue
+            out.append({"at": entry.get("at"), "pass": entry.get("pass"),
+                        "summary": entry.get("summary"), "window_blocks": entry.get("window_blocks"),
+                        "broken": len(entry.get("broken") or []), "seconds": entry.get("seconds"),
+                        "name": name})
+        return out
 
     def payer_status(self, env):
         """Who can pay from this machine, and what that key holds where.
