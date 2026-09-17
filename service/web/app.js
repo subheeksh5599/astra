@@ -109,7 +109,14 @@ Astra = {
     bindApp();
     try {
       const cfg = await loadConfig();
-      el("payer-destination").innerHTML = chainOptions(cfg.watched_domains[0]);
+      // The source defaults to the busiest chain this rail runs on, and the
+      // destination to another; both are selectable, because which chain is
+      // the source is the payer's business and their wallet's balance decides it.
+      const preferredSource = cfg.chains["6"] ? 6 : cfg.watched_domains[0];
+      const preferredDestination = cfg.watched_domains.find((d) => Number(d) !== Number(preferredSource))
+        ?? cfg.watched_domains[0];
+      el("payer-source").innerHTML = chainOptions(preferredSource);
+      el("payer-destination").innerHTML = chainOptions(preferredDestination);
       text(el("cfg-line"),
         `${cfg.deployment} deployment \u00b7 attestation via ${new URL(cfg.attestation_base).host}`);
       const faucet = el("faucet");
@@ -371,8 +378,9 @@ async function connectWallet() {
 async function openTransfer() {
   clearError();
   const cfg = ASTRAA.config;
-  const sourceDomain = cfg.watched_domains[0];
-  const source = cfg.chains[sourceDomain];
+  const sourceDomain = Number(el("payer-source").value);
+  const source = cfg.chains[String(sourceDomain)];
+  if (!source) { showError("pick a source chain the rail watches"); return; }
   const destinationDomain = Number(el("payer-destination").value);
   const amount = BigInt(Math.round(Number(el("payer-amount").value.trim()) * 1e6));
   const caller = el("payer-caller").value.trim();
