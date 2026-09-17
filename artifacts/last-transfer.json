@@ -1,10 +1,14 @@
 {
-  "burnTx": "0x27e417c44a724686ee48f0b9a5817ad844536f29e8e09adc9ab9c0402afc6168",
-  "source": 6,
-  "destination": 0,
+  "burn_tx": "0x969353cef2a024279464103f3cd804ed77559997ec7daf729edd606fd7b35f6f",
+  "burn_status": "0x1",
+  "approve_tx": "0x2708cee6eb5edf8fcf316e7b41e299b8bbe1c0178f55a0c27dd903df0bd2b7e6",
+  "source_domain": 6,
+  "destination_domain": 0,
+  "amount": 50000,
+  "amount_usdc": 0.05,
+  "payer": "0x3991D5267e013fB9d5f2fbb30B8F3D8FF97C1AD9",
+  "recipient": "0x3991D5267e013fB9d5f2fbb30B8F3D8FF97C1AD9",
   "caller": null,
   "deployment": "v2",
-  "amount": 50000,
-  "payer": "0x3991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad9",
-  "maxFee": 50
+  "threshold": 1000
 }
