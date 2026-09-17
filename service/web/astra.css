@@ -1,0 +1,147 @@
+/* =====================================================================
+   ASTRA design system
+   A transfer is either on its way, waiting, or refused. Colour is used
+   only for those three states and nothing else, so a colour on this page
+   always answers the question the page exists to answer. Geometry is
+   all-sharp; there are no rounded corners anywhere.
+   ===================================================================== */
+
+@font-face{font-family:Geist;src:url(fonts/Geist-Regular.woff2)format("woff2");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:Geist;src:url(fonts/Geist-Medium.woff2)format("woff2");font-weight:500;font-style:normal;font-display:swap}
+@font-face{font-family:Geist;src:url(fonts/Geist-SemiBold.woff2)format("woff2");font-weight:600;font-style:normal;font-display:swap}
+@font-face{font-family:"Geist Mono";src:url(fonts/GeistMono-Regular.woff2)format("woff2");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"Geist Mono";src:url(fonts/GeistMono-Medium.woff2)format("woff2");font-weight:500;font-style:normal;font-display:swap}
+
+:root{
+  --ink:#08090b;
+  --ink-2:#0e1013;
+  --ink-3:#14171b;
+  --paper:#eef0f2;
+  --rule:rgba(238,240,242,.13);
+  --rule-faint:rgba(238,240,242,.06);
+  --dim:#8f959d;
+  --transit:#3f9d8f;      /* on its way, or arrived */
+  --waiting:#c8901f;      /* early, not wrong */
+  --refused:#c2503c;      /* may not move */
+  --sans:Geist,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --gut:clamp(18px,3.6vw,52px);
+  --max:1360px;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--sans);
+  font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased;font-synthesis-weight:none}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--transit);outline-offset:2px}
+::selection{background:var(--transit);color:var(--ink)}
+
+.wrap{width:100%;max-width:var(--max);margin-inline:auto;padding-inline:var(--gut)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.dim{color:var(--dim)}
+.nowrap{white-space:nowrap}
+.hidden{display:none!important}
+
+/* --- masthead -------------------------------------------------------- */
+.bar{position:sticky;top:0;z-index:20;background:rgba(8,9,11,.92);backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--rule)}
+.bar-in{display:flex;align-items:center;gap:14px;height:56px}
+.mark{display:flex;align-items:center;gap:9px;font-weight:600;letter-spacing:.14em;font-size:13px}
+.mark i{width:9px;height:9px;background:var(--transit);display:block}
+.mark i.stuck{background:var(--refused)}
+.spacer{flex:1}
+.chip{font-family:var(--mono);font-size:11px;letter-spacing:.04em;border:1px solid var(--rule);
+  padding:3px 8px;color:var(--dim);display:inline-flex;align-items:center;gap:6px}
+.chip b{color:var(--paper);font-weight:500}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--dim);display:inline-block}
+.dot.on{background:var(--transit)}
+.dot.bad{background:var(--refused)}
+.nav{display:flex;gap:16px;font-size:13.5px;color:var(--dim)}
+.nav a:hover{color:var(--paper)}
+
+/* --- sections -------------------------------------------------------- */
+section{padding-block:clamp(40px,6vw,86px);border-bottom:1px solid var(--rule-faint)}
+h1{font-size:clamp(34px,5.4vw,62px);line-height:1.04;letter-spacing:-.022em;font-weight:600;margin:0 0 18px}
+h2{font-size:clamp(20px,2.5vw,27px);line-height:1.2;letter-spacing:-.015em;font-weight:600;margin:0 0 14px}
+h3{font-size:15px;font-weight:600;margin:0 0 8px}
+p{margin:0 0 14px;max-width:74ch}
+.lede{font-size:clamp(16px,1.8vw,19px);color:var(--dim);max-width:70ch}
+.kicker{font-family:var(--mono);font-size:11.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:16px}
+.grid{display:grid;gap:1px;background:var(--rule-faint)}
+.grid>*{background:var(--ink);padding:20px}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+@media(max-width:860px){.g2,.g3{grid-template-columns:1fr}}
+
+/* --- the invariant --------------------------------------------------- */
+.invariant{border:1px solid var(--rule);padding:22px;display:flex;gap:18px;align-items:flex-start;
+  background:linear-gradient(180deg,var(--ink-2),var(--ink))}
+.invariant .mono{color:var(--transit);font-size:13px}
+.ruleline{font-family:var(--mono);font-size:13px;color:var(--dim);border-left:1px solid var(--rule);padding-left:14px}
+
+/* --- state legend ---------------------------------------------------- */
+.states{display:flex;gap:18px;flex-wrap:wrap;font-size:13px}
+.states span{display:inline-flex;align-items:center;gap:7px;color:var(--dim)}
+.states i{width:8px;height:8px;display:block}
+.s-transit{background:var(--transit)}
+.s-waiting{background:var(--waiting)}
+.s-refused{background:var(--refused)}
+
+/* --- tables ---------------------------------------------------------- */
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--rule-faint);vertical-align:top}
+th{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);
+  border-bottom:1px solid var(--rule)}
+tbody tr:hover{background:var(--ink-2)}
+td.mono{font-size:12.5px}
+.tag{font-family:var(--mono);font-size:11px;padding:2px 6px;border:1px solid var(--rule);color:var(--dim)}
+.tag.t{color:var(--transit);border-color:rgba(63,157,143,.4)}
+.tag.w{color:var(--waiting);border-color:rgba(200,144,31,.4)}
+.tag.r{color:var(--refused);border-color:rgba(194,80,60,.4)}
+.reason{font-family:var(--mono);font-size:12px;color:var(--paper)}
+.why{color:var(--dim);font-size:12.5px;margin-top:3px;max-width:56ch}
+
+/* --- controls -------------------------------------------------------- */
+.btn{border:1px solid var(--rule);padding:7px 12px;font-size:13px;color:var(--paper);
+  background:var(--ink-2);display:inline-flex;gap:8px;align-items:center}
+.btn:hover{border-color:var(--paper)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--paper);color:var(--ink);border-color:var(--paper);font-weight:500}
+.btn.ghost{background:transparent}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.field label{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+input,select{background:var(--ink-3);border:1px solid var(--rule);color:var(--paper);
+  padding:9px 11px;font-family:var(--mono);font-size:13px;width:100%}
+input:focus,select:focus{border-color:var(--transit);outline:none}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.err{border:1px solid rgba(194,80,60,.45);background:rgba(194,80,60,.07);color:var(--paper);
+  padding:12px 14px;font-size:13.5px;margin-block:16px}
+.ok{border:1px solid rgba(63,157,143,.45);background:rgba(63,157,143,.07);padding:12px 14px;font-size:13.5px}
+.note{font-size:12.5px;color:var(--dim);max-width:70ch}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:13px}
+.kv dt{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);
+  padding-top:2px}
+.kv dd{margin:0;font-family:var(--mono);font-size:12.5px;word-break:break-all}
+.code{background:var(--ink-2);border:1px solid var(--rule);padding:13px 15px;font-family:var(--mono);
+  font-size:12.5px;overflow-x:auto;white-space:pre}
+.pill{font-family:var(--mono);font-size:11.5px;border:1px solid var(--rule);padding:4px 9px;color:var(--dim)}
+footer{padding-block:34px;color:var(--dim);font-size:12.5px}
+footer .row{gap:20px}
+
+/* --- dashboard layout: payer rail beside the collection -------------- */
+.dash{display:grid;grid-template-columns:352px minmax(0,1fr);gap:1px;background:var(--rule-faint);
+  min-height:calc(100vh - 56px)}
+.dash>*{background:var(--ink)}
+.payer{padding:22px}
+.collect{padding:22px;min-width:0}
+@media(max-width:1000px){.dash{grid-template-columns:1fr}}
+.skel{height:44px;background:linear-gradient(90deg,var(--ink-2),var(--ink-3),var(--ink-2));
+  animation:pulse 1.4s infinite}
+@keyframes pulse{0%{opacity:.55}50%{opacity:.9}100%{opacity:.55}}
+.counters{display:flex;gap:26px;flex-wrap:wrap;margin-bottom:18px}
+.counters div{min-width:88px}
+.counters .v{font-family:var(--mono);font-size:22px}
+.counters .k{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim)}
