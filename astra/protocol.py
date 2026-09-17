@@ -214,3 +214,19 @@ def _addr(value):
     return text.lower() if text.startswith("0x") else text
 
 
+def transfer_id(parsed: dict) -> str:
+    """The protocol's own identity for a transfer: its source domain and nonce.
+
+    Deliberately not a local counter. A rail that keys on its own bookkeeping
+    cannot tell that a transfer has already been delivered by someone else.
+    """
+    return f"{parsed['source_domain']}:{parsed['nonce']}"
+
+
+def is_open_caller(parsed: dict) -> bool:
+    """True when the protocol lets anyone complete the transfer."""
+    return str(parsed["destination_caller"]).lower() == ZERO_ADDRESS
+
+
+def amount_usdc(parsed: dict, decimals: int = 6) -> float:
+    return parsed["amount"] / (10 ** decimals)
