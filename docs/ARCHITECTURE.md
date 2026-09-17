@@ -56,7 +56,22 @@ that produced it. The pair of them is the story: the delivery is why the refusal
 | `astra/classifier.py` | when money may move: pure, ordered, reason-coded |
 | `astra/rail.py` | one pass: observe, verify, decide, act, record |
 | `astra/inflight.py` | discovery from the source log stream; the destination's verdict per transfer |
+| `astra/pairing.py` | the invariant: a verdict per transfer from the destinations' own events, and the three ways it can break |
 | `astra/rpc.py` | read-only JSON-RPC |
+
+## The invariant, over a window of transfers
+
+`astra/pairing.py` answers a different question from the rail: not "what should happen to this
+transfer" but "what happened to all of them". It reads every message each source chain announced in a
+window, then reads each destination's own receipt events, and pairs them by the key both live
+deployments publish: source domain and nonce. Three things make a pass exit non-zero — a signed
+attestation with nothing received (stranded), the same nonce received more than once, and a mint that
+is short of the burn by more than the fee the message itself carries (measured from the token's own
+transfer event in the minting transaction).
+
+`scripts/astra_watch.py` runs that pass on an interval and journals each one, so a transfer able to
+move and not moving becomes a record rather than an observation someone happened to make. It does not
+spend: finishing stays an explicit act.
 
 ## The receipt
 
@@ -82,6 +97,7 @@ destination's record of the nonce.
 | `GET /api/config` | chains, domains, token and contract addresses for the browser — nothing is configured in the client |
 | `GET /api/inflight?blocks&limit` | the transfers in flight across every watched domain, newest first |
 | `POST /api/complete` | run one pass over one transfer and return the receipt |
+| `GET /api/inspect?burn_tx&source_domain&destination_domain` | the same pass with `dry_run`: the decision and the evidence, and nothing broadcast |
 | `GET /api/receipts`, `GET /api/receipt/<name>` | the receipts as written |
 
 The browser pages are static files served by the same process: a landing page and a control surface
@@ -90,8 +106,13 @@ finishes it through the rail.
 
 ## Testing
 
-The tests split the same way the code does. `tests/test_protocol.py` pins the decoder against messages
-this project actually produced on testnet (they are fixtures, and they are real). The other two files
-exercise the decision function and the execution client's polling with a scripted transport, because
+The tests split the same way the code does. `tests/test_protocol.py` pins both decoders against
+messages this project actually produced on testnet (they are fixtures, and they are real). The
+decision function and the execution client's polling are exercised with a scripted transport, because
 the states that matter — a hash that arrives late, a terminal failure, a revert — are states a live
-chain will not produce on demand.
+chain will not produce on demand. `tests/test_pairing.py` holds the invariant's arithmetic, including
+the two spellings of one nonce that must land on one identity.
+
+Two consistency tests exist because a divergence here would be silent: the watched domains must be
+exactly the chains the configured deployment is present on, and every watched domain must have a chain
+id, a token and an endpoint.
