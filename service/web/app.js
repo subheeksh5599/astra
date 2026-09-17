@@ -465,8 +465,14 @@ async function loadPayer() {
 function renderPayer(payer) {
   const box = el("payer-box");
   if (!payer.configured) {
-    box.innerHTML = `<div class="brief">No paying key on this machine.<br>
-      <span class="dim">${payer.detail || ""}</span></div>`;
+    const hosted = ASTRAA.config && ASTRAA.config.read_only;
+    box.innerHTML = hosted
+      ? `<div class="brief">This instance holds no paying key.<br>
+           <span class="dim">It reads both chains and finishes transfers through the execution
+           layer, including yours. Creating one is signed in your own wallet, below &mdash; or run
+           the rail locally, where a key lives.</span></div>`
+      : `<div class="brief">No paying key on this machine.<br>
+           <span class="dim">${payer.detail || ""}</span></div>`;
     el("btn-open").disabled = true;
     el("btn-open-finish").disabled = true;
     return;

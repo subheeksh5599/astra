@@ -117,6 +117,36 @@ def transmitter(env: dict, domain: int):
     return TRANSMITTERS[deployment(env)].get(domain)
 
 
+def receipts_dir(env: dict) -> str:
+    """Where receipts are written. Overridable because a deployment may be read-only.
+
+    On a serverless host the bundle is not writable, so the caller points this at a
+    writable directory and the committed receipts are still read from the repository.
+    """
+    return env.get("ASTRA_RECEIPTS_DIR") or os.path.join(ROOT, "artifacts", "receipts")
+
+
+def written_receipt_dirs(env: dict) -> list:
+    """Every directory a receipt may be in, the committed ones first."""
+    here = os.path.join(ROOT, "artifacts", "receipts")
+    chosen = receipts_dir(env)
+    return [here] if chosen == here else [here, chosen]
+
+
+def watch_dir(env: dict) -> str:
+    return env.get("ASTRA_WATCH_DIR") or os.path.join(ROOT, "artifacts", "watch")
+
+
+def read_only(env: dict) -> bool:
+    """True when this instance must not sign anything itself.
+
+    A hosted copy holds no paying key and no signing tool, so the only way value
+    moves there is the one the rail is for: a transfer somebody else made, finished
+    through the execution layer. Saying so is better than failing at signing time.
+    """
+    return str(env.get("ASTRA_READ_ONLY", "")).lower() in ("1", "true", "yes")
+
+
 def supports(env: dict, domain: int) -> bool:
     """Is this deployment actually present on this chain?"""
     return transmitter(env, domain) is not None

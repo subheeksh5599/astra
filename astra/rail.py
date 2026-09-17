@@ -21,8 +21,8 @@ import time
 
 from . import classifier, protocol
 from .attestation import Attestation
-from .config import (CHAIN_IDS, LOCAL_DOMAIN_ABI, ROOT, attestation_base,
-                     attestation_version, keeperhub_key, rpc_url, transmitter)
+from .config import (CHAIN_IDS, LOCAL_DOMAIN_ABI, attestation_base, attestation_version,
+                     keeperhub_key, load_env, receipts_dir, rpc_url, transmitter)
 from .keeperhub import KeeperHub
 from .rpc import Rpc
 
@@ -199,13 +199,13 @@ class Rail:
 
     # -- receipts ---------------------------------------------------------
     @staticmethod
-    def write_receipt(receipt: dict) -> str:
+    def write_receipt(receipt: dict, env: dict | None = None) -> str:
         """Write one receipt per decision, never one file per transfer.
 
         A refusal is evidence too, and it must not overwrite the receipt of the
         delivery that made the refusal correct: the pair of them is the story.
         """
-        folder = os.path.join(ROOT, "artifacts", "receipts")
+        folder = receipts_dir(env or load_env())
         os.makedirs(folder, exist_ok=True)
         name = str(receipt["transfer_id"]).replace(":", "-").replace("0x", "")[:20]
         action = str((receipt.get("decision") or {}).get("action", "decision"))

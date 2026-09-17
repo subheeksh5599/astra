@@ -27,11 +27,11 @@ from urllib.parse import parse_qs, urlparse
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from astra import inflight, pairing, payer  # noqa: E402
+from astra import classifier, inflight, pairing, payer  # noqa: E402
 from astra.attestation import Attestation  # noqa: E402
 from astra.config import (CHAIN_IDS, DOMAIN_NAMES, MESSENGERS, USDC, attestation_base,  # noqa: E402
-                          attestation_version, deployment, load_env, rpc_url, supports,
-                          transmitter)
+                          attestation_version, deployment, load_env, read_only, receipts_dir,
+                          rpc_url, supports, transmitter, watch_dir, written_receipt_dirs)
 from astra.keeperhub import KeeperHub  # noqa: E402
 from astra.rail import Rail  # noqa: E402
 from astra.rpc import Rpc  # noqa: E402
@@ -48,6 +48,26 @@ SCAN_TTL_SECONDS = 30
 # bound is what keeps a public endpoint from being hammered by parallelism.
 STATE_WINDOW = 8
 STATE_WORKERS = 4
+
+#: How many transfers one instance will broadcast in a window. The rail is
+#: permissionless by design, but an endpoint anyone can poke should not be able to
+#: spend an unbounded amount of the executor's gas.
+EXECUTE_LIMIT = 6
+EXECUTE_WINDOW_SECONDS = 600
+_EXECUTIONS: list = []
+_EXECUTE_LOCK = threading.Lock()
+
+
+def executions_recently() -> int:
+    now = time.time()
+    with _EXECUTE_LOCK:
+        _EXECUTIONS[:] = [at for at in _EXECUTIONS if now - at < EXECUTE_WINDOW_SECONDS]
+        return len(_EXECUTIONS)
+
+
+def note_execution() -> None:
+    with _EXECUTE_LOCK:
+        _EXECUTIONS.append(time.time())
 _SCAN_LOCK = threading.Lock()
 _SCAN_CACHE: dict = {}
 
@@ -84,6 +104,7 @@ def public_config(env: dict) -> dict:
         }
     return {
         "deployment": name,
+        "read_only": read_only(env),
         "chains": chains,
         "watched_domains": sorted(chains),
         "attestation_base": attestation_base(env),
@@ -247,7 +268,7 @@ class Handler(BaseHTTPRequestHandler):
     @staticmethod
     def watch_journal(limit: int = 5) -> list:
         """The last few scheduled passes, as the watcher wrote them."""
-        folder = os.path.join(ROOT, "artifacts", "watch")
+        folder = watch_dir(load_env())
         out = []
         if not os.path.isdir(folder):
             return out
@@ -291,6 +312,12 @@ class Handler(BaseHTTPRequestHandler):
         """
         env = load_env()
         body = body or {}
+        if read_only(env):
+            return self.send_json({
+                "error": "this instance holds no paying key: sign the burn in your own wallet, "
+                         "or run the rail locally where a key is configured",
+                "read_only": True,
+            }, 403)
         steps: list = []
 
         def step(message: str) -> None:
@@ -324,12 +351,17 @@ class Handler(BaseHTTPRequestHandler):
             step(f"waiting up to {wait}s for the source chain to finalise")
             try:
                 rail = Rail(env)
+                if executions_recently() >= EXECUTE_LIMIT:
+                    raise RuntimeError(f"this instance has broadcast {EXECUTE_LIMIT} transfers in the "
+                                       f"last {EXECUTE_WINDOW_SECONDS // 60} minutes")
                 receipt = rail.run({"source_domain": source, "destination_domain": destination,
                                     "burn_tx": transfer["burn_tx"]},
                                    max_wait=wait, interval=10,
                                    on_wait=lambda state, reads, left: step(
                                        f"attestation {state.get('state')} after {reads} reads, {left}s left"))
-                rail.write_receipt(receipt)
+                if (receipt.get("decision") or {}).get("action") == classifier.COMPLETE:
+                    note_execution()
+                rail.write_receipt(receipt, env)
                 result["receipt"] = receipt
                 result["mint_link"] = receipt.get("transaction_link")
                 step(f"destination said: {(receipt.get('decision') or {}).get('reason')}")
@@ -339,34 +371,43 @@ class Handler(BaseHTTPRequestHandler):
         return self.send_json(result)
 
     def receipts(self):
-        folder = os.path.join(ROOT, "artifacts", "receipts")
-        out = []
-        if os.path.isdir(folder):
-            for name in sorted(os.listdir(folder), reverse=True):
-                if not name.endswith(".json"):
+        """Every receipt this instance can see, newest first.
+
+        A hosted instance is read-only, so it serves the receipts committed to the
+        repository plus anything it managed to write where it is allowed to. Both
+        are receipts; the page does not need to care which is which.
+        """
+        seen: dict = {}
+        for folder in written_receipt_dirs(load_env()):
+            if not os.path.isdir(folder):
+                continue
+            for name in os.listdir(folder):
+                if not name.endswith(".json") or name in seen:
                     continue
                 try:
                     with open(os.path.join(folder, name), encoding="utf-8") as fh:
                         data = json.load(fh)
                 except (OSError, ValueError):
                     continue
-                out.append({
+                seen[name] = {
                     "name": name,
                     "transfer_id": data.get("transfer_id"),
                     "decision": data.get("decision"),
                     "transaction_hash": data.get("transaction_hash"),
                     "transaction_link": data.get("transaction_link"),
-                })
+                }
+        out = [seen[name] for name in sorted(seen, reverse=True)]
         return self.send_json({"receipts": out})
 
     def receipt(self, name):
         if not name.replace("-", "").replace("_", "").isalnum():
             return self.send_json({"error": "bad receipt name"}, 400)
-        path = os.path.join(ROOT, "artifacts", "receipts", f"{name}.json")
-        if not os.path.exists(path):
-            return self.send_json({"error": "no such receipt"}, 404)
-        with open(path, encoding="utf-8") as fh:
-            return self.send_json(json.load(fh))
+        for folder in written_receipt_dirs(load_env()):
+            path = os.path.join(folder, f"{name}.json")
+            if os.path.exists(path):
+                with open(path, encoding="utf-8") as fh:
+                    return self.send_json(json.load(fh))
+        return self.send_json({"error": "no such receipt"}, 404)
 
     def complete(self, body):
         burn_tx = (body or {}).get("burn_tx")
@@ -379,10 +420,17 @@ class Handler(BaseHTTPRequestHandler):
             "burn_tx": burn_tx,
         }
         wait = int(body.get("wait_seconds") or 0)
+        if executions_recently() >= EXECUTE_LIMIT:
+            return self.send_json({
+                "error": f"this instance has broadcast {EXECUTE_LIMIT} transfers in the last "
+                         f"{EXECUTE_WINDOW_SECONDS // 60} minutes; try again shortly",
+            }, 429)
         try:
             rail = Rail(env)
             receipt = rail.run(request, max_wait=wait, interval=10) if wait else rail.run(request)
-            rail.write_receipt(receipt)
+            if (receipt.get("decision") or {}).get("action") == classifier.COMPLETE:
+                note_execution()
+            rail.write_receipt(receipt, env)
         except Exception as exc:  # noqa: BLE001
             return self.send_json({"error": str(exc)[:300]}, 502)
         return self.send_json(receipt)
