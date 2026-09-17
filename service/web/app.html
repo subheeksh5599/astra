@@ -134,6 +134,43 @@
         <tbody id="ledger-rows"><tr><td colspan="3" class="skel"></td></tr></tbody>
       </table>
     </div>
+    <div style="margin-top:48px" id="invariant">
+      <div class="eyebrow">The invariant</div>
+      <h3>One burn, exactly one mint &mdash; read from both chains</h3>
+      <p class="note" style="margin-bottom:16px">
+        Every burn in the window is paired with a mint the destination chain itself reported, and the
+        value that arrived is measured against the value that left, less the fee the message carries.
+      </p>
+      <div class="counters" id="inv-counters">
+        <div><div class="v" id="i-paired">&middot;</div><div class="k">paired</div></div>
+        <div><div class="v" id="i-stranded">&middot;</div><div class="k">stranded</div></div>
+        <div><div class="v" id="i-inflight">&middot;</div><div class="k">in flight</div></div>
+        <div><div class="v" id="i-unwatched">&middot;</div><div class="k">unwatched</div></div>
+      </div>
+      <div class="row" style="margin-bottom:16px">
+        <button class="btn outline sm" id="btn-invariant">Run the invariant</button>
+        <span class="note" id="inv-summary">not run yet</span>
+      </div>
+      <div id="inv-broken"></div>
+      <table>
+        <thead><tr><th style="width:220px">Transfer</th><th style="width:150px">Destination</th>
+          <th style="width:120px">Attestation</th><th style="width:130px">Verdict</th><th>Value</th></tr></thead>
+        <tbody id="inv-rows"><tr><td colspan="5" class="dim">run it to read the window</td></tr></tbody>
+      </table>
+      <div style="margin-top:28px">
+        <div class="eyebrow">Scheduled passes</div>
+        <p class="note" style="margin-bottom:12px">
+          The watcher runs the same pass on an interval and journals each one, so a transfer that could
+          move and has not becomes a record instead of an observation nobody happened to make. It exits
+          non-zero on a broken pass, and it never spends.
+        </p>
+        <table>
+          <thead><tr><th style="width:200px">When</th><th style="width:120px">Window</th>
+            <th>What it found</th></tr></thead>
+          <tbody id="inv-passes"><tr><td colspan="3" class="dim">no pass has been journaled yet</td></tr></tbody>
+        </table>
+      </div>
+    </div>
   </main>
 
 </div>

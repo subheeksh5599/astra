@@ -128,6 +128,7 @@ Astra = {
     }
     await refresh();
     await loadLedger();
+    await loadInvariant(false);
   },
 };
 
@@ -208,6 +209,7 @@ function bindApp() {
   el("btn-open-finish").addEventListener("click", () => openFromServer(true));
   el("btn-wallet-open").addEventListener("click", openTransfer);
   el("filter-blocks").addEventListener("change", refresh);
+  el("btn-invariant").addEventListener("click", () => loadInvariant(true));
 }
 
 function showError(message) {
@@ -356,6 +358,70 @@ async function loadLedger() {
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="3" class="dim">receipts unavailable: ${err.message}</td></tr>`;
   }
+}
+
+/* --- the invariant ---------------------------------------------------- */
+
+/* The collection says what should happen to each transfer. This says what actually
+   happened to all of them: paired, stranded, received twice, or short. */
+async function loadInvariant(interactive) {
+  const summary = el("inv-summary");
+  const rows = el("inv-rows");
+  const blocks = Number(el("filter-blocks").value || 1200) * 2;
+  if (interactive) {
+    rows.innerHTML = `<tr><td colspan="5" class="dim">reading every burn in the window\u2026</td></tr>`;
+  }
+  text(summary, "reading\u2026");
+  try {
+    const out = await jget(`/api/pairing?blocks=${blocks}&limit=14`);
+    renderInvariant(out);
+  } catch (err) {
+    text(summary, `could not read the invariant: ${err.message}`);
+    if (interactive) rows.innerHTML = `<tr><td colspan="5" class="dim">${err.message}</td></tr>`;
+  }
+}
+
+function renderInvariant(out) {
+  const counts = { paired: 0, stranded: 0, "in flight": 0, unwatched: 0, unknown: 0 };
+  (out.rows || []).forEach((row) => { counts[row.verdict] = (counts[row.verdict] || 0) + 1; });
+  text(el("i-paired"), String(counts.paired || 0));
+  text(el("i-stranded"), String(counts.stranded || 0));
+  text(el("i-inflight"), String(counts["in flight"] || 0));
+  text(el("i-unwatched"), String(counts.unwatched || 0));
+  text(el("inv-summary"),
+    `${out.summary || "no transfers"} over the last ${out.blocks} source blocks`);
+
+  const tbody = el("inv-rows");
+  tbody.innerHTML = (out.rows || []).length ? out.rows.map((row) => {
+    const value = row.minted_amount !== null && row.minted_amount !== undefined
+      ? `${fmtAmount(row.minted_amount)} of ${fmtAmount(row.expected_amount)} USDC`
+      : (row.value_matches === false ? "short" : "\u00b7");
+    const cls = row.verdict === "paired" ? "ok" : (row.verdict === "stranded" ? "no" : "wait");
+    return `<tr>
+      <td><span class="mono">${short(row.transfer_id, 14, 6)}</span></td>
+      <td>${row.destination_name || "\u00b7"}</td>
+      <td><span class="mono dim">${row.attestation || "\u00b7"}</span></td>
+      <td><span class="tag ${cls}">${row.verdict}</span></td>
+      <td class="mono">${value}</td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="5" class="dim">nothing in this window</td></tr>`;
+
+  const broken = out.broken || [];
+  el("inv-broken").innerHTML = broken.length ? `
+    <div class="err" style="margin-bottom:16px">
+      The invariant is broken in ${broken.length} ${broken.length === 1 ? "place" : "places"}:
+      ${broken.map((row) => `${short(row.transfer_id, 16, 6)} (${row.delivered_count > 1
+        ? "received " + row.delivered_count + " times" : (row.value_matches === false ? "minted short" : "stranded")})`)
+        .join(", ")}
+    </div>` : "";
+
+  const passes = out.passes || [];
+  el("inv-passes").innerHTML = passes.length ? passes.map((entry) => `
+    <tr>
+      <td class="mono dim">${entry.at || "\u00b7"}</td>
+      <td class="mono">${entry.window_blocks || "\u00b7"}</td>
+      <td>${entry.summary || "\u00b7"}${entry.broken ? ` \u00b7 <span class="tag no">${entry.broken} broken</span>` : ""}</td>
+    </tr>`).join("") : `<tr><td colspan="3" class="dim">no pass has been journaled yet</td></tr>`;
 }
 
 /* --- the payer side, on this machine ---------------------------------- */
