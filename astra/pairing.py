@@ -25,6 +25,8 @@ is the other half of "exactly one mint", and it is a count, not a claim.
 """
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 from . import inflight, protocol
 from .attestation import Attestation
 from .config import (CHAIN_IDS, DOMAIN_NAMES, USDC, attestation_base, attestation_version,
@@ -155,20 +157,32 @@ def collect(env: dict | None = None, blocks: int = 6000, limit: int = 20,
             rpcs[domain] = Rpc(rpc_url(env, domain))
         return rpcs[domain]
 
+    domains = [domain for domain in sorted(CHAIN_IDS) if supports(env, domain)]
+    if progress:
+        progress(f"reading {len(domains)} chains: {', '.join(DOMAIN_NAMES.get(d, str(d)) for d in domains)}")
+
+    def read_chain(domain: int):
+        """One chain's announcements and its receipts. Independent of the others,
+        so a slow endpoint costs its own chain and not the whole pass."""
+        try:
+            return domain, (inflight.scan(rpc_for(domain), domain, blocks, deployment=name),
+                            receipts(rpc_for(domain), domain, name, blocks))
+        except Exception:  # noqa: BLE001 - one endpoint must not blind the others
+            return domain, ([], {})
+
+    with ThreadPoolExecutor(max_workers=max(1, len(domains))) as pool:
+        read = dict(pool.map(read_chain, domains))
+
     sources: list = []
     received: dict = {}
-    for domain in sorted(CHAIN_IDS):
-        if not supports(env, domain):
-            continue
-        if progress:
-            progress(f"reading domain {domain} ({DOMAIN_NAMES.get(domain, domain)})")
-        sources.extend(inflight.scan(rpc_for(domain), domain, blocks, deployment=name))
-        received[domain] = receipts(rpc_for(domain), domain, name, blocks)
+    for domain in domains:
+        announced, counted = read.get(domain, ([], {}))
+        sources.extend(announced)
+        received[domain] = counted
 
     sources.sort(key=lambda item: item.get("block") or 0, reverse=True)
 
-    rows = []
-    for transfer in sources[:limit]:
+    def pair_one(transfer: dict) -> dict:
         att = attestation.by_transaction(transfer["source_domain"], transfer["burn_tx"])
         parsed = None
         if att.get("message"):
@@ -205,7 +219,7 @@ def collect(env: dict | None = None, blocks: int = 6000, limit: int = 20,
         if seen and expected is not None and destination is not None:
             minted = minted_amount(rpc_for(destination), seen[0], (parsed or {}).get("mint_recipient") or "",
                                    USDC.get(destination, ""))
-        rows.append({
+        return {
             "transfer_id": transfer_key(transfer["source_domain"], nonce if nonce is not None
                                         else transfer["burn_tx"][:12]),
             "source_domain": transfer["source_domain"],
@@ -223,7 +237,16 @@ def collect(env: dict | None = None, blocks: int = 6000, limit: int = 20,
             "minted_amount": minted,
             "value_matches": (None if minted is None or expected is None else minted == expected),
             "burn_tx": transfer["burn_tx"],
-        })
+        }
+
+    # Each transfer is paired from its own two chains, so the pairs are assembled
+    # in parallel windows and kept in the order they were read: the newest first,
+    # whoever happens to answer first.
+    rows: list = []
+    wanted = sources[:limit]
+    with ThreadPoolExecutor(max_workers=min(4, len(wanted) or 1)) as pool:
+        for row in pool.map(pair_one, wanted):
+            rows.append(row)
 
     if watched_only:
         # A transfer to a chain this rail cannot reach is honest output but it is

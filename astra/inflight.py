@@ -48,7 +48,9 @@ def scan(rpc: Rpc, source_domain: int, blocks: int, deployment: str = "v2") -> l
         return []
     head = rpc.block_number()
     from_block = max(1, head - blocks)
-    logs = rpc.get_logs(address, [], from_block, head)
+    # Asked for by event, not "everything this address said": the filter is the
+    # protocol's own signature, and the decode below still checks each log.
+    logs = rpc.get_logs(address, [protocol.MESSAGE_SENT_TOPIC], from_block, head)
 
     found = []
     for log in logs:

@@ -66,6 +66,11 @@ CORE = {
 
 ZERO_ADDRESS = "0x" + "0" * 40
 
+# The protocol's announcement event, as the source chain emits it. Filtering on
+# it is what makes discovery a read of the protocol's own stream rather than a
+# read of everything an address ever said.
+MESSAGE_SENT_TOPIC = "0x8c5261668696ce22758910d05bab8f186d6eb247ceac2af2e82c7dc17669b036"
+
 
 class BadMessage(ValueError):
     """The bytes are not a message this rail can reason about."""

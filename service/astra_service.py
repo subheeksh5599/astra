@@ -19,6 +19,7 @@ import json
 import os
 import sys
 import threading
+from concurrent.futures import ThreadPoolExecutor
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -41,6 +42,12 @@ WEB = os.path.join(ROOT, "service", "web")
 # every load. One scan is shared for a short window rather than repeated per
 # request; the age is reported with the rows so a stale answer is visible.
 SCAN_TTL_SECONDS = 30
+
+# How many transfers are classified per batch, and how many of those at once.
+# The batch is what makes the pass finish in seconds instead of minutes; the
+# bound is what keeps a public endpoint from being hammered by parallelism.
+STATE_WINDOW = 8
+STATE_WORKERS = 4
 _SCAN_LOCK = threading.Lock()
 _SCAN_CACHE: dict = {}
 
@@ -245,10 +252,15 @@ class Handler(BaseHTTPRequestHandler):
 def build_inflight(env: dict, blocks: int, limit: int) -> list:
     """The transfers in flight, newest first, across every watched chain.
 
-    Candidates are collected from every source first and merged by block before
-    any of them is classified: reading one chain to exhaustion would hide the
-    other chain's transfers behind it, which is exactly the blind spot this rail
-    exists to remove.
+    Candidates are collected from every source chain before any of them is
+    classified, and merged by block: reading one chain to exhaustion would hide
+    the other chains' transfers behind it, which is exactly the blind spot this
+    rail exists to remove.
+
+    The reads are independent, so they run together: five chains, each with its
+    own endpoint, read in parallel, then the per-transfer work in bounded windows.
+    A pass over five chains should cost about what a pass over one did, and the
+    verdict for one transfer never depends on another transfer's timing.
     """
     name = deployment(env)
     kh = KeeperHub(env["KH_API_KEY"])
@@ -256,53 +268,72 @@ def build_inflight(env: dict, blocks: int, limit: int) -> list:
     wallet = kh.wallet()
 
     per_domain = int(env.get("ASTRA_PER_DOMAIN", "10"))
-    candidates = []
-    for source in sorted(CHAIN_IDS):
-        if not supports(env, source):
-            continue
-        rpc = Rpc(rpc_url(env, source))
-        found = inflight.scan(rpc, source, blocks, deployment=name)
-        # A cap per chain keeps one busy chain from filling the whole view: the
-        # point of watching five is seeing five.
-        candidates.extend(found[:per_domain])
+    sources = [domain for domain in sorted(CHAIN_IDS) if supports(env, domain)]
+
+    def scan_one(domain: int) -> list:
+        try:
+            # A cap per chain keeps one busy chain from filling the whole view:
+            # the point of watching five is seeing five.
+            return inflight.scan(Rpc(rpc_url(env, domain)), domain, blocks,
+                                 deployment=name)[:per_domain]
+        except Exception:  # noqa: BLE001 - one chain's endpoint must not blind the others
+            return []
+
+    with ThreadPoolExecutor(max_workers=max(1, len(sources))) as pool:
+        found = list(pool.map(scan_one, sources))
+    candidates = [transfer for per_chain in found for transfer in per_chain]
     candidates.sort(key=lambda item: item.get("block") or 0, reverse=True)
 
     # Most traffic on a live testnet goes to chains this rail does not serve. A
     # view that is 90% "not mine" hides the transfers it can actually finish, so
     # those are held back and shown up to a small cap: enough to see the boundary,
     # never enough to bury the work.
-    reachable, beyond = [], []
+    reachable: list = []
+    beyond: list = []
     max_beyond = int(env.get("ASTRA_MAX_BEYOND", "3"))
-    for transfer in candidates:
-        if len(reachable) >= limit and len(beyond) >= max_beyond:
-            break
-        record = inflight.state_of_transfer(kh, attestation, {**env, "ASTRA_DEPLOYMENT": name},
-                                            transfer, wallet=wallet)
-        if record.get("attestation_state") == "not_found":
-            continue  # a source log with no message behind it is not a transfer
-        parsed = record.get("parsed") or {}
-        destination = parsed.get("destination_domain")
-        reason = (record.get("decision") or {}).get("reason")
-        bucket = beyond if reason in ("UNSUPPORTED_DOMAIN", "DEPLOYMENT_ABSENT") else reachable
-        if len(bucket) >= (max_beyond if bucket is beyond else limit):
-            continue
-        bucket.append({
-            "burn_tx": record["burn_tx"],
-            "source_domain": record["source_domain"],
-            "destination_domain": destination,
-            "destination_name": DOMAIN_NAMES.get(destination, str(destination) if destination is not None else None),
-            "transfer_id": f"{record['source_domain']}:{parsed.get('nonce')}" if parsed.get("nonce")
-            else f"{record['source_domain']}:{record['burn_tx'][:12]}",
-            "nonce": parsed.get("nonce"),
-            "mint_recipient": parsed.get("mint_recipient"),
-            "amount": parsed.get("amount"),
-            "amount_usdc": (parsed.get("amount") or 0) / 1e6,
-            "destination_caller": parsed.get("destination_caller"),
-            "attestation_state": record.get("attestation_state"),
-            "decision": record.get("decision"),
-            "finished": record.get("finished"),
-            "block": record.get("block"),
-        })
+    # Every candidate costs an attestation read, so the pass is bounded: a view
+    # that would spend a minute looking for a tenth row is not a view anyone
+    # waits for, and the answer for the rows it did read is already true.
+    max_examined = int(env.get("ASTRA_MAX_EXAMINED", "24"))
+    index = 0
+    while (index < len(candidates) and index < max_examined
+           and (len(reachable) < limit or len(beyond) < max_beyond)):
+        window = candidates[index:index + STATE_WINDOW]
+        index += STATE_WINDOW
+
+        def describe(transfer: dict) -> dict:
+            return inflight.state_of_transfer(kh, attestation, {**env, "ASTRA_DEPLOYMENT": name},
+                                              transfer, wallet=wallet)
+
+        with ThreadPoolExecutor(max_workers=min(STATE_WORKERS, len(window))) as pool:
+            records = list(pool.map(describe, window))
+
+        for record in records:
+            if record.get("attestation_state") == "not_found":
+                continue  # a source log with no message behind it is not a transfer
+            parsed = record.get("parsed") or {}
+            destination = parsed.get("destination_domain")
+            reason = (record.get("decision") or {}).get("reason")
+            bucket = beyond if reason in ("UNSUPPORTED_DOMAIN", "DEPLOYMENT_ABSENT") else reachable
+            if len(bucket) >= (max_beyond if bucket is beyond else limit):
+                continue
+            bucket.append({
+                "burn_tx": record["burn_tx"],
+                "source_domain": record["source_domain"],
+                "destination_domain": destination,
+                "destination_name": DOMAIN_NAMES.get(destination, str(destination) if destination is not None else None),
+                "transfer_id": f"{record['source_domain']}:{parsed.get('nonce')}" if parsed.get("nonce")
+                else f"{record['source_domain']}:{record['burn_tx'][:12]}",
+                "nonce": parsed.get("nonce"),
+                "mint_recipient": parsed.get("mint_recipient"),
+                "amount": parsed.get("amount"),
+                "amount_usdc": (parsed.get("amount") or 0) / 1e6,
+                "destination_caller": parsed.get("destination_caller"),
+                "attestation_state": record.get("attestation_state"),
+                "decision": record.get("decision"),
+                "finished": record.get("finished"),
+                "block": record.get("block"),
+            })
     return reachable + beyond
 
 
