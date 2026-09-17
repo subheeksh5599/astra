@@ -190,8 +190,10 @@ class Rail:
         """
         folder = os.path.join(ROOT, "artifacts", "receipts")
         os.makedirs(folder, exist_ok=True)
-        name = str(receipt["transfer_id"]).replace(":", "-").replace("0x", "")[:24]
-        path = os.path.join(folder, f"{name}.json")
+        name = str(receipt["transfer_id"]).replace(":", "-").replace("0x", "")[:20]
+        action = str((receipt.get("decision") or {}).get("action", "decision"))
+        stamp = time.strftime("%Y%m%dT%H%M%S", time.gmtime())
+        path = os.path.join(folder, f"{stamp}-{name}-{action}.json")
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(receipt, fh, indent=2)
         return path
