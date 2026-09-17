@@ -82,12 +82,14 @@
     <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--mist)">
       <div class="eyebrow">Window</div>
       <div class="field">
-        <label for="filter-blocks">Source blocks to read</label>
+        <label for="filter-blocks">How far back to read</label>
         <select id="filter-blocks">
-          <option value="1200" selected>1200 (about an hour)</option>
-          <option value="4000">4000 (about five hours)</option>
-          <option value="12000">12000 (a day)</option>
+          <option value="3600" selected>1 hour — the same hour on every chain</option>
+          <option value="18000">5 hours</option>
+          <option value="86400">1 day</option>
         </select>
+        <p class="note">A window is a span of time, not a number of blocks: the same
+        1,200 blocks is four hours on one of these chains and five minutes on another.</p>
       </div>
       <p class="note" id="cfg-line">reading configuration</p>
     </div>

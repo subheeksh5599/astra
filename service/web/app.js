@@ -230,18 +230,19 @@ async function refresh() {
   ASTRAA.busy = true;
   el("btn-refresh").disabled = true;
   clearError();
-  const blocks = Number(el("filter-blocks").value || 1200);
+  const seconds = Number(el("filter-blocks").value || 3600);
   const started = Date.now();
   const ticker = setInterval(() => {
     text(el("last-scan"), `reading every watched chain\u2026 ${Math.round((Date.now() - started) / 1000)}s`);
   }, 1000);
   text(el("last-scan"), "reading every watched chain\u2026");
   try {
-    const body = await jget(`/api/inflight?blocks=${blocks}&limit=14`);
+    const body = await jget(`/api/inflight?seconds=${seconds}&limit=14`);
     ASTRAA.rows = body.rows || [];
     renderRows(ASTRAA.rows);
     const age = body.age_seconds ? `, read ${body.age_seconds}s ago` : "";
-    text(el("last-scan"), `${ASTRAA.rows.length} in flight over the last ${blocks} source blocks${age}`);
+    const span = seconds >= 86400 ? `${seconds / 86400} day` : (seconds >= 3600 ? `${seconds / 3600}h` : `${seconds}s`);
+    text(el("last-scan"), `${ASTRAA.rows.length} in flight over the last ${span}${age}`);
   } catch (err) {
     showError(`could not read the chains: ${err.message}`);
     text(el("last-scan"), "scan failed");
@@ -386,13 +387,13 @@ function offlineBanner(err) {
 async function loadInvariant(interactive) {
   const summary = el("inv-summary");
   const rows = el("inv-rows");
-  const blocks = Number(el("filter-blocks").value || 1200) * 2;
+  const seconds = Number(el("filter-blocks").value || 3600);
   if (interactive) {
     rows.innerHTML = `<tr><td colspan="5" class="dim">reading every burn in the window\u2026</td></tr>`;
   }
   text(summary, "reading\u2026");
   try {
-    const out = await jget(`/api/pairing?blocks=${blocks}&limit=14`);
+    const out = await jget(`/api/pairing?seconds=${seconds}&limit=14`);
     renderInvariant(out);
   } catch (err) {
     text(summary, `could not read the invariant: ${err.message}`);
@@ -408,7 +409,8 @@ function renderInvariant(out) {
   text(el("i-inflight"), String(counts["in flight"] || 0));
   text(el("i-unwatched"), String(counts.unwatched || 0));
   text(el("inv-summary"),
-    `${out.summary || "no transfers"} over the last ${out.blocks} source blocks`);
+    `${out.summary || "no transfers"} over the last ${out.span_seconds
+      ? (out.span_seconds / 3600).toFixed(0) + "h" : out.blocks + " source blocks"}`);
 
   const tbody = el("inv-rows");
   tbody.innerHTML = (out.rows || []).length ? out.rows.map((row) => {
