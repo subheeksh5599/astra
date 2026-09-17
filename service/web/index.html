@@ -4,71 +4,134 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ASTRA: one burn, exactly one mint</title>
-<meta name="description" content="A cross-chain transfer leaves one chain and arrives on another, unless it does not. ASTRA watches both ends, finishes what is in flight, and refuses, by name, what may not move.">
+<meta name="description" content="A cross-chain transfer leaves one chain and arrives on another, unless it does not. ASTRA watches both ends, finishes what is in flight, and refuses by name what may not move.">
 <link rel="stylesheet" href="astra.css">
 </head>
 <body>
 
-<header class="bar">
-  <div class="wrap bar-in">
-    <a class="mark" href="/"><i id="mark-dot"></i><span>ASTRA</span></a>
-    <span class="mono dim" style="font-size:11.5px">cross-chain delivery rail</span>
-    <span class="spacer"></span>
-    <span class="chip" id="chip-wallet"><span class="dot"></span>executor: <b>reading</b></span>
-    <span class="chip" id="chip-chains"><span class="dot"></span><b>chains</b></span>
-    <span class="chip" id="chip-inflight">in flight: <b>&middot;</b></span>
-  </div>
-</header>
+<div class="hero">
 
-<section>
+  <nav class="nav on-hero">
+    <div class="wrap nav-in">
+      <a class="logo" href="/"><i></i><span>ASTRA</span></a>
+      <div class="nav-links">
+        <a href="#invariant">The invariant</a>
+        <a href="#refusals">Refusals</a>
+        <a href="#execute">Execution</a>
+      </div>
+      <span class="spacer"></span>
+      <span class="chip" id="chip-wallet"><span class="dot"></span>executor <b>reading</b></span>
+      <a class="btn outline sm" href="https://github.com/subheeksh5599/astra" target="_blank" rel="noreferrer">Source</a>
+      <a class="btn primary sm" href="/app">Open the control surface</a>
+    </div>
+  </nav>
+
+  <svg class="hero-sky" viewBox="0 0 1440 620" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="cloudA" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#fdf6e3"/><stop offset="1" stop-color="#efd9a6"/>
+      </linearGradient>
+      <linearGradient id="cloudB" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#f8ecc9"/><stop offset="1" stop-color="#e6cd94"/>
+      </linearGradient>
+    </defs>
+    <rect y="500" width="1440" height="120" fill="#0a6b4a" opacity=".35"/>
+    <g opacity=".96">
+      <ellipse cx="196" cy="486" rx="150" ry="62" fill="url(#cloudA)"/>
+      <ellipse cx="128" cy="470" rx="86" ry="52" fill="#fdf6e3"/>
+      <ellipse cx="262" cy="462" rx="78" ry="50" fill="#fbf1d8"/>
+      <ellipse cx="196" cy="440" rx="66" ry="44" fill="#fdf8ea"/>
+    </g>
+    <g opacity=".9">
+      <ellipse cx="1218" cy="500" rx="176" ry="68" fill="url(#cloudB)"/>
+      <ellipse cx="1128" cy="482" rx="92" ry="54" fill="#fdf6e3"/>
+      <ellipse cx="1310" cy="474" rx="86" ry="52" fill="#f8ecc9"/>
+      <ellipse cx="1218" cy="452" rx="72" ry="46" fill="#fdf8ea"/>
+    </g>
+    <g opacity=".5">
+      <ellipse cx="700" cy="512" rx="118" ry="46" fill="url(#cloudA)"/>
+      <ellipse cx="662" cy="498" rx="66" ry="38" fill="#fdf6e3"/>
+      <ellipse cx="748" cy="494" rx="58" ry="36" fill="#fbf1d8"/>
+    </g>
+    <g opacity=".3">
+      <ellipse cx="980" cy="118" rx="96" ry="34" fill="#fdf6e3"/>
+      <ellipse cx="386" cy="150" rx="76" ry="28" fill="#fdf6e3"/>
+    </g>
+  </svg>
+
   <div class="wrap">
-    <div class="kicker">the gap</div>
+    <div class="hero-eyebrow">Cross-chain delivery rail</div>
     <h1>A transfer can leave one chain<br>and never arrive on the other.</h1>
     <p class="lede">
       The tokens are burned on the source chain. The destination has not minted them, and it will not,
-      until somebody hands it the signed attestation. Until then the money is in flight: not lost, not
-      spendable, and invisible unless someone is watching both ends.
+      until somebody hands it a signed attestation. In between, the value is spendable nowhere.
     </p>
-    <div class="row" style="margin-top:22px">
-      <a class="btn primary" href="/app">Open the control surface</a>
-      <a class="btn ghost" href="#refusals">See the refusals</a>
+
+    <form class="hero-form" id="trace-form" autocomplete="off">
+      <input id="trace-input" placeholder="Paste a source transaction hash" aria-label="source transaction hash">
+      <button type="submit" aria-label="Trace the transfer">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" stroke="currentColor" stroke-width="1.6"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </form>
+    <p class="hero-note" id="trace-note">The rail reads both chains and answers with a decision. Nothing is broadcast here.</p>
+    <div class="hero-out hidden" id="trace-out"></div>
+  </div>
+
+  <div class="wrap hero-stage">
+    <div class="product">
+      <div class="product-bar">
+        <span class="dot"></span>
+        <span class="title">astra</span>
+        <span>/</span>
+        <span>the collection</span>
+        <span class="spacer"></span>
+        <span id="product-count">reading the chains</span>
+      </div>
+      <div class="product-body">
+        <div class="product-side">
+          <div class="side-item active"><i></i>In flight</div>
+          <div class="side-item"><i></i>Receipts</div>
+          <div class="side-item"><i></i>Pairing proof</div>
+          <div class="side-item"><i></i>Watched chains</div>
+          <div class="side-item"><i></i>Refusals</div>
+        </div>
+        <div class="product-main">
+          <div id="evidence"><div class="skel"></div></div>
+        </div>
+      </div>
     </div>
   </div>
-</section>
+</div>
 
-<section>
+<section id="invariant">
   <div class="wrap">
-    <div class="kicker">the rail</div>
-    <div class="invariant">
-      <span class="mono">invariant</span>
-      <div>
-        <h3>One burn, exactly one mint.</h3>
-        <p style="margin-bottom:8px" class="dim">
-          For every transfer the source chain announced, the destination chain received it once, or it
-          has not received it yet, and there is no third possibility. ASTRA reads both ends and proves
-          the pair from the chains themselves. It keeps no ledger of its own that could disagree with
-          them.
-        </p>
-        <span class="mono dim" style="font-size:12px">prove it: <code>scripts/prove_pairing.py</code>, which exits non-zero the moment a burn has no mint</span>
-      </div>
+    <div class="section-head">
+      <div class="eyebrow">The invariant</div>
+      <h2>One burn, exactly one mint.</h2>
+      <p class="lede">
+        For every message the source chain announced, the destination chain received it once, or it has
+        not received it yet, and there is no third possibility. The rail reads both ends and proves the
+        pair from the chains themselves.
+      </p>
     </div>
-
-    <div class="grid g3" style="margin-top:26px">
-      <div>
-        <h3>Observe</h3>
-        <p class="dim">The source chain's own log stream says which transfers exist. The destination's
-        own answer says which ones arrived. No indexer is asked what is pending.</p>
+    <div class="cards two">
+      <div class="card">
+        <div class="eyebrow">Executable</div>
+        <h3>prove_pairing.py</h3>
+        <p>Reads both chains and reports, per transfer, paired, in flight, stranded or unwatched. It
+        exits non-zero the moment a burn is stranded with a signed attestation, or a nonce was received
+        twice.</p>
+        <div class="code">1 paired, 1 stranded, 6 unwatched</div>
       </div>
-      <div>
-        <h3>Defer or deliver</h3>
-        <p class="dim">An attestation that is not signed yet is not an error, so the rail waits and says
-        so. An attestation that is signed is handed to the destination contract, which decides whether
-        the transfer may complete.</p>
-      </div>
-      <div>
-        <h3>Refuse by name</h3>
-        <p class="dim">Every refusal carries the reason code and the evidence that produced it, taken
-        from the chain or from the destination's own revert, never from a guess.</p>
+      <div class="card wash">
+        <div class="eyebrow">Why it holds</div>
+        <h3>Nothing is taken on trust</h3>
+        <p>The source chain's own log stream says which transfers exist. The destination contract's own
+        record says which ones arrived. No indexer is asked what is pending, and nothing this rail wrote
+        down is consulted.</p>
       </div>
     </div>
   </div>
@@ -76,76 +139,77 @@
 
 <section id="refusals">
   <div class="wrap">
-    <div class="kicker">when money may not move</div>
-    <h2>The refusal is the product.</h2>
+    <div class="section-head">
+      <div class="eyebrow">When money may not move</div>
+      <h2>The refusal is the product.</h2>
+      <p class="lede">Every refusal carries a reason code and the evidence that produced it, taken from
+      the chain or from the destination's own answer.</p>
+    </div>
     <table>
-      <thead><tr><th style="width:230px">Reason</th><th>What it means</th><th style="width:150px">Read from</th></tr></thead>
+      <thead>
+        <tr><th style="width:250px">Reason</th><th>What it means</th><th style="width:190px">Read from</th></tr>
+      </thead>
       <tbody>
-        <tr><td class="reason">ALREADY_DELIVERED</td><td class="why">The destination received this transfer already. A second delivery would spend gas to fail, or worse, double-send under a local nonce bookkeeping system.</td><td class="mono">destination revert</td></tr>
-        <tr><td class="reason">CALLER_RESTRICTED</td><td class="why">The message names a single address allowed to complete it. If that is not the executor, completion is not ours to attempt, and the rail names who can.</td><td class="mono">message field</td></tr>
-        <tr><td class="reason">ATTESTATION_PENDING</td><td class="why">The source chain has not finalised, so no attestation is signed. Nothing is wrong; it is early. The rail waits.</td><td class="mono">attestation service</td></tr>
-        <tr><td class="reason">RECIPIENT_MISMATCH</td><td class="why">The transfer being asked about is not the transfer in the message: a different recipient, amount, or token. A request is not evidence.</td><td class="mono">message body</td></tr>
-        <tr><td class="reason">ROUTE_MISMATCH</td><td class="why">The message travels between domains other than the ones the caller named.</td><td class="mono">message header</td></tr>
-        <tr><td class="reason">MESSAGE_INCONSISTENT</td><td class="why">Our decode of the message and the attestation service's decode disagree. A decision taken on a disagreement is a decision about a transfer nobody has described correctly, so the rail stops.</td><td class="mono">two decodes</td></tr>
-        <tr><td class="reason">UNSUPPORTED_DOMAIN</td><td class="why">The transfer goes to a chain this rail does not watch, and an unwatched chain has no contract to call.</td><td class="mono">rail config</td></tr>
-        <tr><td class="reason">WRONG_TRANSMITTER</td><td class="why">The contract about to be called reports a different chain domain than the message's destination. The call would be aimed at the wrong contract.</td><td class="mono">on-chain read</td></tr>
-        <tr><td class="reason">PREFLIGHT_REVERT</td><td class="why">The destination would reject the delivery for some other reason. The rail carries that reason rather than replacing it.</td><td class="mono">destination simulation</td></tr>
+        <tr><td><span class="reason">ALREADY_DELIVERED</span></td><td class="why">The destination received this transfer already. A second delivery spends gas to fail, or double-sends under a local nonce bookkeeping system.</td><td class="dim">the destination's record</td></tr>
+        <tr><td><span class="reason">CALLER_RESTRICTED</span></td><td class="why">The message names a single address allowed to complete it. If that is not the executor, completion is not ours to attempt, and the rail names who can.</td><td class="dim">message field</td></tr>
+        <tr><td><span class="reason">ATTESTATION_PENDING</span></td><td class="why">The source chain has not finalised, so no attestation is signed. Nothing is wrong; it is early. The rail waits.</td><td class="dim">attestation service</td></tr>
+        <tr><td><span class="reason">RECIPIENT_MISMATCH</span></td><td class="why">The transfer being asked about is not the transfer in the message: a different recipient, amount or token. A request is not evidence.</td><td class="dim">message body</td></tr>
+        <tr><td><span class="reason">ROUTE_MISMATCH</span></td><td class="why">The message travels between domains other than the ones the caller named.</td><td class="dim">message header</td></tr>
+        <tr><td><span class="reason">MESSAGE_INCONSISTENT</span></td><td class="why">Our decode of the message and the attestation service's decode disagree, so the rail stops instead of deciding about a transfer nobody has described correctly.</td><td class="dim">two decodes</td></tr>
+        <tr><td><span class="reason">UNSUPPORTED_DOMAIN</span></td><td class="why">The transfer goes to a chain this rail does not watch, and an unwatched chain has no contract to call.</td><td class="dim">rail configuration</td></tr>
+        <tr><td><span class="reason">WRONG_TRANSMITTER</span></td><td class="why">The contract about to be called reports a different chain domain than the message's destination.</td><td class="dim">on-chain read</td></tr>
+        <tr><td><span class="reason">PREFLIGHT_REVERT</span></td><td class="why">The destination would reject the delivery for another reason. The rail carries that reason rather than replacing it.</td><td class="dim">destination simulation</td></tr>
       </tbody>
     </table>
   </div>
 </section>
 
-<section>
+<section id="execute" class="tight">
   <div class="wrap">
-    <div class="kicker">how it executes</div>
-    <div class="grid g2">
-      <div>
-        <h2>Nothing here signs with a key of its own</h2>
-        <p class="dim">
-          The rail holds no wallet. Every state-changing call goes through an execution layer that
-          simulates first, reports whether the call would revert, and only then broadcasts, with an
-          idempotency key derived from the transfer itself. The rail reads the destination's verdict
-          out of that simulation before anything is spent.
-        </p>
+    <div class="section-head">
+      <div class="eyebrow">How it executes</div>
+      <h2>No key, no signing, no guessing.</h2>
+    </div>
+    <div class="cards three">
+      <div class="card">
+        <div class="eyebrow">Execution</div>
+        <h3>Simulate, then broadcast</h3>
+        <p>Every state-changing call goes through the execution layer: simulate, read the verdict,
+        broadcast with an idempotency key derived from the transfer, then poll until the hash appears.</p>
       </div>
-      <div>
-        <h2>The payer side stays in your wallet</h2>
-        <p class="dim">
-          Creating a transfer is your transaction: you approve and you burn, from your own address, and
-          the message names you as the recipient. The rail's job starts the moment your transfer is in
-          flight and stops when the destination has it.
-        </p>
+      <div class="card">
+        <div class="eyebrow">Payer side</div>
+        <h3>Your wallet signs the burn</h3>
+        <p>Creating a transfer is the payer's own transaction. They approve and they burn from their own
+        address, and the message names them as the recipient.</p>
+      </div>
+      <div class="card">
+        <div class="eyebrow">Record</div>
+        <h3>A receipt per decision</h3>
+        <p>Deliveries and refusals are written to the same folder with the evidence that produced them.
+        The pair of them is the story: the delivery is why the refusal is correct.</p>
       </div>
     </div>
-    <div class="code" style="margin-top:20px">python3 scripts/astra_open_transfer.py --amount 1
+    <div class="code" style="margin-top:24px">python3 scripts/astra_open_transfer.py --amount 1
 python3 scripts/astra_inflight.py --blocks 5000
 python3 scripts/astra_complete.py --burn-tx 0x... --source 6 --destination 0 --wait 300
 python3 scripts/prove_pairing.py</div>
   </div>
 </section>
 
-<section>
+<section class="tight">
   <div class="wrap">
-    <div class="kicker">live, on testnet</div>
-    <div class="states" style="margin-bottom:18px">
-      <span><i class="s-transit"></i> delivered</span>
-      <span><i class="s-waiting"></i> waiting on the attestation</span>
-      <span><i class="s-refused"></i> refused, with a reason</span>
-    </div>
-    <div id="evidence"><div class="skel" style="height:56px"></div></div>
-    <p class="note" style="margin-top:14px">
-      These are read live from this deployment's receipts when the page loads. Nothing on this page is
-      illustrative: if the list is empty, the receipts folder is empty.
-    </p>
+    <div class="eyebrow">Watched</div>
+    <div class="band" id="band"></div>
   </div>
 </section>
 
 <footer>
   <div class="wrap row">
     <span>&copy; ASTRA</span>
-    <a href="/app">control surface</a>
-    <a id="link-repo" href="https://github.com/subheeksh5599/astra">source</a>
-    <span class="mono dim" id="foot-config">reading configuration</span>
+    <a href="/app">Control surface</a>
+    <a href="https://github.com/subheeksh5599/astra" target="_blank" rel="noreferrer">Source</a>
+    <span id="foot-config">reading configuration</span>
   </div>
 </footer>
 
