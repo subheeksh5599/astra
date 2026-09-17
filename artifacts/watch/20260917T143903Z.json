@@ -1,0 +1,16 @@
+{
+  "pass": 1,
+  "at": "2026-09-17T14:39:03Z",
+  "window_blocks": 2000,
+  "domains": {
+    "0": 368,
+    "2": 0,
+    "3": 0,
+    "6": 20,
+    "7": 0
+  },
+  "summary": "8 unwatched",
+  "broken": [],
+  "stranded": [],
+  "seconds": 23.1
+}
