@@ -5,3 +5,4 @@ __pycache__/
 .pytest_cache/
 artifacts/*.log
 .DS_Store
+.vercel
