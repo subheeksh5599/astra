@@ -74,3 +74,72 @@ It exits non-zero when a burn is stranded with a signed attestation (value sitti
 move) and when a nonce has been received twice. The destination's answer to "have you received this
 nonce" is what decides; nothing this rail wrote down is consulted.
 
+## What the rail does
+
+    observe   read the source chain's own log stream; read the destination's own record
+    decide    complete, defer, or refuse — a pure function over what was observed
+    act       hand the signed attestation to the destination through the execution layer
+    record    write a receipt: what was seen, what was decided, what moved, and in what order
+
+The refusal is the product. Every one carries a reason code and the evidence that produced it:
+
+| Reason | Meaning | Read from |
+|---|---|---|
+| `ALREADY_DELIVERED` | the destination already holds this transfer | the destination contract's record for the nonce |
+| `CALLER_RESTRICTED` | the message names one allowed caller and it is not the executor | the message's `destinationCaller` |
+| `ATTESTATION_PENDING` | the source has not finalised, so nothing is signed yet | the attestation service |
+| `RECIPIENT_MISMATCH` / `AMOUNT_MISMATCH` / `TOKEN_MISMATCH` | the request does not describe the transfer in the message | the message body |
+| `ROUTE_MISMATCH` | the message travels between other domains than the caller named | the message header |
+| `MESSAGE_INCONSISTENT` | our decode and the service's decode of the same bytes disagree | two decodes |
+| `WRONG_TRANSMITTER` | the contract about to be called serves another domain | an on-chain read |
+| `UNSUPPORTED_DOMAIN` | the transfer goes somewhere this rail does not watch | rail configuration |
+| `PREFLIGHT_REVERT` | the destination would reject the delivery for another reason | the destination's simulation |
+| `UNREADABLE_MESSAGE` | the message body could not be decoded, so nothing is attempted | our decoder |
+
+## How it executes
+
+The rail holds no key and signs nothing itself. Every state-changing call goes through an execution
+layer: simulate first, read the verdict, broadcast with an idempotency key derived from the transfer,
+then poll until the transaction hash appears. The destination's simulation is not decoration — it is
+where the already-delivered refusal comes from, before anything is spent.
+
+The payer side stays in the wallet of whoever is paying. Creating a transfer is their transaction:
+they approve and they burn from their own address, and the message names them as the recipient.
+
+## Two deployments, one rail
+
+Two versions of the protocol are live on these testnets at once. The later one accepts a fee cap and a
+finality threshold, so a transfer can be attested as soon as the source block is confirmed; the earlier
+one waits for full finality. Both are in the configuration, both have been delivered by this rail, and
+the message layout of the later one is decoded field by field. What is decoded and what is not is
+stated in [docs/LIMITATIONS.md](docs/LIMITATIONS.md).
+
+## Layout
+
+    astra/config.py          chains, domains, contract addresses, environment
+    astra/protocol.py        the wire format: header, body, corroboration against a second decode
+    astra/attestation.py     the attestation service: pending, final, not found
+    astra/keeperhub.py       the execution layer: simulate, broadcast, poll, idempotency
+    astra/classifier.py      when money may move, as a pure function
+    astra/rail.py            one pass over one transfer: observe, decide, act, record
+    astra/inflight.py        discovery: the source log stream, the destination's verdict
+    astra/rpc.py             a read-only JSON-RPC client
+    scripts/                 the payer side, discovery, completion, and the invariant
+    service/                 the HTTP surface and the browser control surface
+    tests/                   32 tests, including the captured messages this project produced
+
+## Run it
+
+```bash
+cp .env.example .env          # fill in the executor key and the payer wallet
+uv venv .venv && uv pip install --python .venv/bin/python pytest
+.venv/bin/python -m pytest tests -q
+
+.venv/bin/python scripts/astra_inflight.py --blocks 4000
+.venv/bin/python scripts/astra_open_transfer.py --amount 1      # your wallet signs this
+.venv/bin/python scripts/astra_complete.py --burn-tx 0x… --source 6 --destination 0 --wait 300
+.venv/bin/python scripts/prove_pairing.py --blocks 4000
+
+.venv/bin/python service/astra_service.py --port 8099           # then open http://127.0.0.1:8099
+```
+
