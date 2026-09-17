@@ -119,39 +119,37 @@ function renderLandingInvariant(out) {
   text(el("l-unwatched"), String(counts.unwatched || 0));
 
   const broken = out.broken || [];
-  text(el("inv-headline"), broken.length
-    ? `${broken.length} break${broken.length === 1 ? "" : "s"} in this window`
-    : `${out.rows ? out.rows.length : 0} transfers read, none broken`);
-
-  const span = out.span_seconds ? `${Math.round(out.span_seconds / 60)} minutes` : "the window";
-  const rates = out.rates
-    ? Object.values(ASTRAA.config.chains)
-        .sort((a, b) => a.domain - b.domain)
+  const read = out.rows ? out.rows.length : 0;
+  const span = out.span_seconds ? `${Math.round(out.span_seconds / 60)} minutes` : "this window";
+  const rates = out.rates && ASTRAA.config
+    ? Object.values(ASTRAA.config.chains).sort((a, b) => a.domain - b.domain)
         .map((c) => {
           const rate = out.rates[String(c.domain)];
-          return rate ? `${c.name} ${rate >= 2 ? rate.toFixed(1) + " blocks/s" : (1 / rate).toFixed(1) + "s"}` : null;
-        }).filter(Boolean).join(" \u00b7 ")
+          if (!rate) return null;
+          // one unit for every chain: seconds per block, however fast the chain is
+          return `${c.name} ${rate >= 1 ? (1 / rate).toFixed(2) : (1 / rate).toFixed(1)}s`;
+        }).filter(Boolean).join("  \u00b7  ")
     : "";
-  text(el("inv-note"), `Paired from the destinations' own receipt events over the last ${span}. `
-    + (rates ? `Measured block time: ${rates}.` : ""));
+  text(el("inv-caps"), `Transfer states over the last ${span}, the same span of history on every chain`);
+  text(el("inv-note"),
+    `${read} transfers observed, ${counts.paired || 0} paired \u2014 `
+    + (broken.length ? `${broken.length} stranded` : "none stranded"));
+  text(el("inv-rate"), rates ? `Block time, measured: ${rates}` : "Measuring each chain's block time\u2026");
 
-  const rows = (out.rows || []).filter((row) => row.verdict === "paired").slice(0, 5);
-  const tbody = el("inv-rows");
-  if (!tbody) return;
-  tbody.innerHTML = rows.length ? rows.map((row) => {
+  const host = el("inv-rows");
+  if (!host) return;
+  const pairs = (out.rows || []).filter((row) => row.verdict === "paired").slice(0, 3);
+  host.innerHTML = pairs.length ? pairs.map((row) => {
     const measured = row.minted_amount !== null && row.minted_amount !== undefined;
     const value = measured
-      ? `${fmtAmount(row.minted_amount)} of ${fmtAmount(row.expected_amount)} USDC`
+      ? `${fmtAmount(row.minted_amount)} of ${fmtAmount(row.expected_amount)}`
       : (row.value_matches === false ? "minted short of the burn" : "not measured");
-    return `<tr>
-      <td><span class="mono">${short(row.transfer_id, 16, 6)}</span>
-        <div class="why">${row.attestation} attestation &middot; ${row.layout || "unknown"} layout</div></td>
-      <td>${row.destination_name || "\u00b7"}</td>
-      <td><span class="tag ok">paired</span></td>
-      <td class="mono">${value}</td>
-    </tr>`;
-  }).join("") : `<tr><td colspan="4" class="dim">Nothing is paired in this window: the latest transfers
-    are still waiting on their source chains.</td></tr>`;
+    return `<div class="pair">
+      <span class="pair-id mono"><span class="dot on"></span>${short(row.transfer_id, 14, 6)}</span>
+      <span class="pair-dest">${row.destination_name || "\u00b7"}</span>
+      <span class="pair-value mono">${value}</span>
+    </div>`;
+  }).join("") : `<div class="pair empty">Nothing paired in this window yet.</div>`;
 }
 
 function renderFacts(pairing, receipts, inflight) {
@@ -159,61 +157,73 @@ function renderFacts(pairing, receipts, inflight) {
   if (!host) return;
   const deliveries = receipts.filter((r) => r.transaction_link);
   const refusals = receipts.filter((r) => r.decision && r.decision.action === "refuse");
-  const rows = pairing.rows || [];
-  const measured = rows.filter((r) => r.minted_amount !== null && r.minted_amount !== undefined);
-  const mintedTotal = measured.reduce((sum, r) => sum + r.minted_amount, 0);
-  const newest = deliveries[0];
-  const chains = ASTRAA.config ? Object.keys(ASTRAA.config.chains).length : 0;
+  const measured = (pairing.rows || [])
+    .filter((r) => r.minted_amount !== null && r.minted_amount !== undefined);
+  const total = measured.reduce((sum, r) => sum + r.minted_amount, 0);
 
   host.innerHTML = `
-    <dt>Deliveries executed</dt>
-    <dd>${deliveries.length} \u2014 ${newest
-      ? `<a class="mono" href="${newest.transaction_link}" target="_blank" rel="noreferrer">${short(newest.transaction_hash, 14, 6)}</a> was the most recent`
-      : "none recorded here yet"}</dd>
-    <dt>Value measured as arrived</dt>
-    <dd>${measured.length ? `${fmtAmount(mintedTotal)} USDC across ${measured.length} paired transfers, read from each destination's token` : "nothing to measure in this window"}</dd>
-    <dt>Refusals recorded</dt>
-    <dd>${refusals.length} \u2014 every one with the evidence that produced it</dd>
-    <dt>Transfers in flight now</dt>
-    <dd>${inflight ? inflight.rows.length : "\u00b7"} across ${chains} chains</dd>
-    <dt>Window read</dt>
-    <dd>${pairing.span_seconds ? Math.round(pairing.span_seconds / 60) : "\u00b7"} minutes, the same span of history on every chain</dd>`;
+    <div class="stat"><b>${deliveries.length}</b><span>deliveries executed</span></div>
+    <div class="stat ok"><b>${measured.length ? fmtAmount(total) : "\u00b7"}</b><span>USDC measured as arrived</span></div>
+    <div class="stat"><b>${refusals.length}</b><span>refusals recorded</span></div>
+    <div class="stat"><b>${inflight ? inflight.rows.length : "\u00b7"}</b><span>in flight right now</span></div>`;
+
+  const newest = deliveries[0];
+  text(el("facts-note"), newest
+    ? `Most recent delivery ${short(newest.transaction_hash, 14, 6)} \u2014 counted from this instance's own receipts, nothing else.`
+    : "No delivery has been executed through this instance yet.");
 }
+
+/* The taxonomy, in six words each. The long form is in the repository; a landing
+   page owes a reader the shape of the thing, not a specification. */
+const REASON_GLOSS = [
+  ["ALREADY_DELIVERED", "the destination already holds it"],
+  ["CALLER_RESTRICTED", "the message names another caller"],
+  ["ATTESTATION_PENDING", "not signed yet; the rail waits"],
+  ["UNSUPPORTED_DOMAIN", "a chain this rail does not watch"],
+  ["DEPLOYMENT_ABSENT", "watched, but not this deployment"],
+  ["WRONG_TRANSMITTER", "the contract serves another domain"],
+  ["RECIPIENT_MISMATCH", "the request is not the transfer"],
+  ["ROUTE_MISMATCH", "other domains than the caller named"],
+  ["MESSAGE_INCONSISTENT", "two decodes of the same bytes disagree"],
+  ["PREFLIGHT_REVERT", "the destination would reject it"],
+];
 
 function renderRefusals(receipts, inflight, pairing) {
   const counted = {};
-  (receipts || []).forEach((r) => {
-    const reason = r.decision && r.decision.reason;
-    if (reason) counted[reason] = (counted[reason] || 0) + 1;
-  });
-  (inflight && inflight.rows ? inflight.rows : []).forEach((row) => {
-    const reason = row.decision && row.decision.reason;
-    if (reason) counted[reason] = (counted[reason] || 0) + 1;
-  });
-  (pairing && pairing.broken ? pairing.broken : []).forEach((row) => {
-    counted.STRANDED = (counted.STRANDED || 0) + 1;
-  });
+  const bump = (reason) => { if (reason) counted[reason] = (counted[reason] || 0) + 1; };
+  (receipts || []).forEach((r) => bump(r.decision && r.decision.reason));
+  (inflight && inflight.rows ? inflight.rows : []).forEach((row) => bump(row.decision && row.decision.reason));
+  (pairing && pairing.broken ? pairing.broken : []).forEach(() => bump("STRANDED"));
 
-  document.querySelectorAll("tr[data-reason]").forEach((tr) => {
-    const n = counted[tr.dataset.reason];
-    const cell = tr.querySelector(".count");
-    if (cell) cell.innerHTML = n
-      ? `<span class="tag ${tr.dataset.reason === "ATTESTATION_PENDING" ? "wait" : "no"}">${n} seen</span>`
-      : `<span class="dim">none here</span>`;
-  });
+  const observed = REASON_GLOSS
+    .filter(([code]) => counted[code])
+    .sort((a, b) => counted[b[0]] - counted[a[0]]);
 
-  const strip = el("refusal-strip");
-  if (!strip) return;
-  const recent = (inflight && inflight.rows ? inflight.rows : [])
-    .filter((row) => row.decision && row.decision.reason)
-    .slice(0, 6);
-  strip.innerHTML = recent.length
-    ? recent.map((row) => `
-        <span class="strip-item">
-          <span class="mono dim">${short(row.transfer_id, 14, 4)}</span>
-          <span class="tag ${row.decision.action === "complete" ? "ok" : (row.decision.action === "defer" ? "wait" : "no")}">${row.decision.reason}</span>
-        </span>`).join("")
-    : `<span class="dim">The rail is reading the chains now; its decisions will appear here.</span>`;
+  const chips = el("refusal-chips");
+  if (chips) {
+    chips.innerHTML = observed.length
+      ? observed.map(([code]) => `<span class="chip-count">${code}<b>${counted[code]}</b></span>`).join("")
+      : `<span class="fine">Reading the chains \u2014 decisions appear here as they are made.</span>`;
+  }
+
+  const list = el("reason-list");
+  if (list) {
+    list.innerHTML = observed.length
+      ? observed.map(([code, gloss]) => `
+        <div class="reason-row">
+          <span class="reason">${code}</span>
+          <span class="gloss">${gloss}</span>
+          <span class="seen on">${counted[code]} seen</span>
+        </div>`).join("")
+      : `<div class="reason-row"><span class="gloss">Nothing refused yet in this window.</span></div>`;
+  }
+
+  /* Defined, never met here. Demoted on purpose: a landing page should not present
+     a taxonomy this instance has not exercised as if it were a finding. */
+  const unmet = REASON_GLOSS.filter(([code]) => !counted[code]).map(([code]) => code);
+  text(el("reason-foot"), unmet.length
+    ? `Also defined, not met on this instance: ${unmet.join(", ")}.`
+    : "Every reason in the taxonomy has been met on this instance.");
 }
 
 /* --- landing ---------------------------------------------------------- */

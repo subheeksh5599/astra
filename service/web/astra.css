@@ -14,6 +14,7 @@
 }
 
 :root{
+  --eyebrow:#0a6b49;
   /* colour */
   --mint:#0c8c5e;
   --ink:#08090a;
@@ -176,7 +177,10 @@ hr{border:0;border-top:1px solid var(--mist);margin:0}
 .side-item.active{background:var(--mint-wash);color:var(--mint);font-weight:500}
 .side-item i{width:16px;height:16px;display:block;border:1.5px solid var(--ink);border-radius:2px}
 .side-item.active i{border-color:var(--mint)}
-.product-main{padding:20px 24px;min-width:0}
+.product-main{padding:22px 26px;min-width:0}
+.product-main table{margin:0}
+.product-main td{vertical-align:middle}
+.product-main .tag{white-space:nowrap}
 
 /* --- sections --------------------------------------------------------- */
 section{padding-block:var(--section)}
@@ -185,7 +189,7 @@ section.tight{padding-block:76px}
 .section-head{max-width:720px;margin-bottom:48px}
 .eyebrow{
   font-size:var(--caption);font-weight:500;letter-spacing:var(--caption-ls);
-  text-transform:uppercase;color:var(--mint);margin-bottom:14px;
+  text-transform:uppercase;color:var(--eyebrow);margin-bottom:14px;
 }
 h2{margin:0 0 18px;font-size:var(--h);line-height:1.15;letter-spacing:var(--h-ls);font-weight:600;color:var(--ink)}
 h3{margin:0 0 10px;font-size:var(--sub);line-height:1.3;letter-spacing:var(--sub-ls);font-weight:600;color:var(--ink)}
@@ -226,7 +230,7 @@ td .mono{font-size:13px;letter-spacing:0}
 }
 .tag.ok{background:var(--mint-wash);color:var(--mint)}
 .tag.wait{background:var(--paper);color:var(--dim);border-color:var(--cloud)}
-.tag.no{background:var(--ink);color:var(--paper)}
+.tag.no{background:var(--paper);color:var(--ink);border-color:var(--cloud)}
 .why{color:var(--dim);font-size:13px;margin-top:6px;max-width:62ch;letter-spacing:0}
 .reason{font-size:13px;font-weight:500;letter-spacing:0}
 
@@ -403,3 +407,111 @@ td .count .tag{font-size:12px}
 .pane-body table{margin-top:4px}
 .form-grid{display:grid;grid-template-columns:repeat(2,minmax(240px,1fr));gap:0 24px}
 @media(max-width:700px){.form-grid{grid-template-columns:1fr}}
+
+
+/* --- landing: numbers and chips instead of paragraphs ----------------- */
+.stats{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;
+}
+.stat{
+  background:var(--paper);border:1px solid var(--mist);border-radius:var(--r-card);
+  padding:26px 28px;
+}
+.stat b{display:block;font-size:34px;line-height:1.08;letter-spacing:-.7px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.stat span{display:block;margin-top:8px;font-size:13px;color:var(--dim)}
+.stat.ok b{color:var(--mint)}
+.fine{margin:16px 0 0;font-size:13px;color:var(--dim);line-height:1.5}
+
+.pairs{margin-top:32px;border-top:1px solid var(--mist)}
+.pair{
+  display:grid;grid-template-columns:minmax(200px,1.1fr) minmax(120px,0.7fr) 1.2fr;
+  gap:20px;align-items:center;padding:16px 0;border-bottom:1px solid var(--mist);font-size:14px;
+}
+.pair .pair-id{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--dim)}
+.pair .pair-dest{color:var(--ink);font-size:14px}
+.pair .pair-value{color:var(--ink);font-size:14px;text-align:right}
+.pair.empty{display:block;color:var(--dim);font-size:14px;padding:18px 0}
+@media(max-width:700px){
+  .pair{grid-template-columns:1fr;gap:4px;padding:14px 0}
+  .pair .pair-value{text-align:left}
+}
+
+.chips{display:flex;flex-wrap:wrap;gap:10px}
+.chip-count{
+  display:inline-flex;align-items:center;gap:9px;border:1px solid var(--cloud);
+  border-radius:var(--r-tag);padding:8px 14px;font-size:12.5px;font-weight:500;
+  letter-spacing:.2px;color:var(--ink);
+}
+.chip-count b{color:var(--mint);font-weight:600;font-variant-numeric:tabular-nums}
+
+.reasons{margin-top:0;display:block}
+.reason-row{
+  display:grid;grid-template-columns:220px minmax(0,54ch) 1fr;gap:16px;align-items:baseline;
+  padding:14px 0;border-bottom:1px solid var(--mist);
+}
+.reason-row .reason{font-size:12.5px;font-weight:500;letter-spacing:.2px;color:var(--ink)}
+.reason-row .gloss{font-size:13px;color:var(--dim);line-height:1.45}
+.reason-row .seen{font-size:12px;color:var(--dim);text-align:right;font-variant-numeric:tabular-nums}
+.reason-row .seen.on{color:var(--mint)}
+@media(max-width:860px){
+  .reason-row{grid-template-columns:150px minmax(0,1fr) 84px;gap:10px}
+}
+.reasons-head{grid-template-columns:220px minmax(0,54ch) 1fr;gap:16px}
+.reason-foot{margin-top:22px}
+
+/* the busiest reason is the finding; the rest are the taxonomy */
+.chip-count:first-child{background:var(--mint-wash);border-color:var(--mint-wash);font-weight:600}
+.chip-count:first-child b{color:var(--eyebrow)}
+
+
+/* --- hierarchy: a lede reads as a lede, a table has a head ------------- */
+.lede{font-size:17px;line-height:1.6;color:var(--ink);max-width:62ch}
+.section-head h2 + .lede{margin-top:20px}
+.fine{margin:20px 0 0;font-size:13.5px;color:var(--dim);line-height:1.55}
+.fine.faint{margin-top:6px;font-size:12.5px;color:var(--dim);opacity:.85}
+
+.stats{margin-top:36px}
+.stat{padding:26px 28px}
+.stat b{font-size:32px;line-height:1;letter-spacing:-.6px}
+.stat span{margin-top:9px;font-size:13px}
+.stat.ok b{color:var(--ink)}
+
+.pairs{margin-top:40px}
+.pair-head{
+  padding:0 0 12px;border-bottom:1px solid var(--mist);
+  font-size:11.5px;font-weight:500;letter-spacing:.65px;text-transform:uppercase;color:var(--dim);
+}
+.pair{padding:16px 0}
+.pair:last-child{border-bottom:0}
+.pair .pair-id{font-size:12.5px}
+.pair .pair-value{font-variant-numeric:tabular-nums}
+
+.reasons-head{
+  display:grid;grid-template-columns:210px 1fr 70px;gap:14px;align-items:baseline;
+  margin:30px 0 0;padding-bottom:11px;border-bottom:1px solid var(--cloud);
+  font-size:11.5px;font-weight:500;letter-spacing:.65px;text-transform:uppercase;color:var(--dim);
+}
+.reasons-head span:last-child{text-align:right}
+.reasons{margin-top:0}
+@media(max-width:860px){
+  .reasons-head{grid-template-columns:150px 1fr 60px;gap:10px}
+}
+
+/* the taxonomy reads as one block: chips and list share a width, the grouping is
+   lede -> chips -> list, not lede -> [everything] */
+#refusals .section-head{margin-bottom:30px}
+.reasons-head,.reasons,.reason-foot{max-width:900px}
+.reasons-head{margin-top:40px}
+
+/* never let a loading block collapse into a hairline */
+.stats:empty{display:none}
+.stat b:empty::after{content:"\00b7"}
+
+/* the tiles need their time anchor, and the notes need room to be two thoughts */
+.caps{
+  font-size:var(--caption);font-weight:500;letter-spacing:var(--caption-ls);
+  text-transform:uppercase;color:var(--dim);margin:40px 0 14px;
+}
+.stats{margin-top:0}
+.fine{margin-top:16px}
+.fine.faint{margin-top:6px}
