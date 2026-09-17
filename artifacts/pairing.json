@@ -1,0 +1,105 @@
+{
+  "rows": [
+    {
+      "transfer_id": "6:0xde9c71de3325c9e83089ea00edce12b8877dbcdd9deb5a3a3cf10ecf001824bf",
+      "source_domain": 6,
+      "destination_domain": 26,
+      "destination_name": 26,
+      "amount_usdc": 19.49,
+      "attestation": "final",
+      "verdict": "unwatched",
+      "burn_tx": "0x62e09ea45e4a34edc5611b4f7b39218ffc97af58dac3e0b8a84a6f4b19596382",
+      "mint_tx": null
+    },
+    {
+      "transfer_id": "6:0x78d3613c7d387fd03d50d24cc8a5c7707d582beb0ea23d505a6ba20cd1645161",
+      "source_domain": 6,
+      "destination_domain": 0,
+      "destination_name": "ethereum-sepolia",
+      "amount_usdc": 1.0,
+      "attestation": "final",
+      "verdict": "stranded",
+      "burn_tx": "0xd517d29c6466b55d63abf2b717f647ca847cb19ae3959c2cfaa0d3537e38d793",
+      "mint_tx": null
+    },
+    {
+      "transfer_id": "6:0x1fe5312960d98a21c655f1c003a1562f04a285887414723e4832ebceb1d54392",
+      "source_domain": 6,
+      "destination_domain": 0,
+      "destination_name": "ethereum-sepolia",
+      "amount_usdc": 1.0,
+      "attestation": "final",
+      "verdict": "paired",
+      "burn_tx": "0x6c7fa66b54ba1608f144d72b403ce4a3d1d07bb4da82ed27c14f3dbfca65d108",
+      "mint_tx": null
+    },
+    {
+      "transfer_id": "6:0x1c9775d130401eab25ae3312024d3d3405b8770d7aa285d88ab18e7fe53e5c66",
+      "source_domain": 6,
+      "destination_domain": 26,
+      "destination_name": 26,
+      "amount_usdc": 9.49,
+      "attestation": "final",
+      "verdict": "unwatched",
+      "burn_tx": "0xb46549c1b39996e820f5ddb76dea5dfd5c02196ec27db2f9333496f056fc6cee",
+      "mint_tx": null
+    },
+    {
+      "transfer_id": "6:0xbdbd3fabe3ee999365ec3f13dff1b607f1df2bb43527c6bdfd192e2160754d10",
+      "source_domain": 6,
+      "destination_domain": 3,
+      "destination_name": 3,
+      "amount_usdc": 15.000392,
+      "attestation": "final",
+      "verdict": "unwatched",
+      "burn_tx": "0x9a2d7a378d86770f99a71f248f144aadc65768edb620e93b6fb0da26a21d5974",
+      "mint_tx": null
+    },
+    {
+      "transfer_id": "0:0x654e6460783e6a8a4143a3d19b70a080660f84003c54901457133464580b2961",
+      "source_domain": 0,
+      "destination_domain": 26,
+      "destination_name": 26,
+      "amount_usdc": 5.7e-05,
+      "attestation": "final",
+      "verdict": "unwatched",
+      "burn_tx": "0xa826490e0770df1471d2645d1cc3c52137d97de2d3a2bd67b52092a13946e495",
+      "mint_tx": null
+    },
+    {
+      "transfer_id": "0:0x5282cf8fdaafece7ed607e7761dcdffc239ce4fd649a235ccf7759837ed2985c",
+      "source_domain": 0,
+      "destination_domain": 26,
+      "destination_name": 26,
+      "amount_usdc": 9.5e-05,
+      "attestation": "final",
+      "verdict": "unwatched",
+      "burn_tx": "0x97d7561bf26def77cb7572e2b4293af11866160bd2e69cc764bb32f113f31bdd",
+      "mint_tx": null
+    },
+    {
+      "transfer_id": "0:0x1e3d9574887c55f0ef0468a9bd2e9b6cccecab8efacefa1a48fc6b5622b59050",
+      "source_domain": 0,
+      "destination_domain": 26,
+      "destination_name": 26,
+      "amount_usdc": 6.8e-05,
+      "attestation": "final",
+      "verdict": "unwatched",
+      "burn_tx": "0x1d6a4b8edc8c9f2a1f5d9c11eaa2752f8fa8229aad0928c9fbf93b7841046541",
+      "mint_tx": null
+    }
+  ],
+  "broken": [
+    {
+      "transfer_id": "6:0x78d3613c7d387fd03d50d24cc8a5c7707d582beb0ea23d505a6ba20cd1645161",
+      "source_domain": 6,
+      "destination_domain": 0,
+      "destination_name": "ethereum-sepolia",
+      "amount_usdc": 1.0,
+      "attestation": "final",
+      "verdict": "stranded",
+      "burn_tx": "0xd517d29c6466b55d63abf2b717f647ca847cb19ae3959c2cfaa0d3537e38d793",
+      "mint_tx": null
+    }
+  ]
+}

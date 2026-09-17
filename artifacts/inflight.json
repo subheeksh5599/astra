@@ -1,0 +1,57 @@
+[
+  {
+    "burn_tx": "0x62e09ea45e4a34edc5611b4f7b39218ffc97af58dac3e0b8a84a6f4b19596382",
+    "transfer_id": "6:None",
+    "amount_usdc": 19.49,
+    "destination": 26,
+    "recipient": "0xfd7dc1f6f0b3329dec41fe8e30b3ac6be4c26d12",
+    "attestation": "final",
+    "decision": "refuse",
+    "reason": "CALLER_RESTRICTED",
+    "finished": false
+  },
+  {
+    "burn_tx": "0xd517d29c6466b55d63abf2b717f647ca847cb19ae3959c2cfaa0d3537e38d793",
+    "transfer_id": "6:None",
+    "amount_usdc": 1.0,
+    "destination": "ethereum-sepolia",
+    "recipient": "0x3991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad9",
+    "attestation": "final",
+    "decision": "refuse",
+    "reason": "CALLER_RESTRICTED",
+    "finished": false
+  },
+  {
+    "burn_tx": "0x6c7fa66b54ba1608f144d72b403ce4a3d1d07bb4da82ed27c14f3dbfca65d108",
+    "transfer_id": "6:None",
+    "amount_usdc": 1.0,
+    "destination": "ethereum-sepolia",
+    "recipient": "0x3991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad9",
+    "attestation": "final",
+    "decision": "refuse",
+    "reason": "ALREADY_DELIVERED",
+    "finished": true
+  },
+  {
+    "burn_tx": "0xb46549c1b39996e820f5ddb76dea5dfd5c02196ec27db2f9333496f056fc6cee",
+    "transfer_id": "6:None",
+    "amount_usdc": 9.49,
+    "destination": 26,
+    "recipient": "0xfd7dc1f6f0b3329dec41fe8e30b3ac6be4c26d12",
+    "attestation": "final",
+    "decision": "refuse",
+    "reason": "CALLER_RESTRICTED",
+    "finished": false
+  },
+  {
+    "burn_tx": "0x9a2d7a378d86770f99a71f248f144aadc65768edb620e93b6fb0da26a21d5974",
+    "transfer_id": "6:None",
+    "amount_usdc": 15.000392,
+    "destination": 3,
+    "recipient": "0x8f79f38c9bc6de4eeacb2a7e7fef46d14e4ffda5",
+    "attestation": "final",
+    "decision": "refuse",
+    "reason": "UNSUPPORTED_DOMAIN",
+    "finished": false
+  }
+]

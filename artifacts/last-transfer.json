@@ -1,0 +1,10 @@
+{
+  "burnTx": "0xd517d29c6466b55d63abf2b717f647ca847cb19ae3959c2cfaa0d3537e38d793",
+  "source": 6,
+  "destination": 0,
+  "caller": "0x617b0e8d15c3a48ddf2ec70ab17bf7cc7dbf3046",
+  "deployment": "v2",
+  "amount": 1000000,
+  "payer": "0x3991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad9",
+  "maxFee": 1000
+}
