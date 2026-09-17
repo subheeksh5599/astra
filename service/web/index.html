@@ -86,17 +86,16 @@
         <span class="dot"></span>
         <span class="title">astra</span>
         <span>/</span>
-        <span>the collection</span>
+        <span>receipts</span>
         <span class="spacer"></span>
         <span id="product-count">reading the chains</span>
       </div>
       <div class="product-body">
         <div class="product-side">
-          <div class="side-item active"><i></i>In flight</div>
-          <div class="side-item"><i></i>Receipts</div>
-          <div class="side-item"><i></i>Pairing proof</div>
-          <div class="side-item"><i></i>Watched chains</div>
+          <div class="side-item active"><i></i>Every decision</div>
+          <div class="side-item"><i></i>Deliveries</div>
           <div class="side-item"><i></i>Refusals</div>
+          <div class="side-item"><i></i>Watched chains</div>
         </div>
         <div class="product-main">
           <div id="evidence"><div class="skel"></div></div>
@@ -117,23 +116,37 @@
         pair from the chains themselves.
       </p>
     </div>
+
     <div class="cards two">
       <div class="card">
-        <div class="eyebrow">Executable</div>
-        <h3>prove_pairing.py</h3>
-        <p>Reads both chains and reports, per transfer, paired, in flight, stranded or unwatched. It
-        exits non-zero the moment a burn is stranded with a signed attestation, or a nonce was received
-        twice.</p>
-        <div class="code">1 paired, 1 stranded, 6 unwatched</div>
-      </div>
-      <div class="card wash">
         <div class="eyebrow">Why it holds</div>
         <h3>Nothing is taken on trust</h3>
         <p>The source chain's own log stream says which transfers exist. The destination contract's own
-        record says which ones arrived. No indexer is asked what is pending, and nothing this rail wrote
-        down is consulted.</p>
+        record says which ones arrived — and its own receipt events say how much arrived. No indexer is
+        asked what is pending, and nothing this rail wrote down is consulted.</p>
+        <p class="note">The window below is the last hour on every chain: a span of time, converted per
+        chain from that chain's measured block rate, so five chains are read over the same history.</p>
+      </div>
+      <div class="card wash">
+        <div class="eyebrow">Live, from this instance</div>
+        <h3 id="inv-headline">reading both chains&hellip;</h3>
+        <div class="counters" id="inv-counters">
+          <div><div class="v" id="l-paired">&middot;</div><div class="k">paired</div></div>
+          <div><div class="v" id="l-inflight">&middot;</div><div class="k">in flight</div></div>
+          <div><div class="v" id="l-stranded">&middot;</div><div class="k">stranded</div></div>
+          <div><div class="v" id="l-unwatched">&middot;</div><div class="k">unwatched</div></div>
+        </div>
+        <p class="note" id="inv-note">reading the invariant&hellip;</p>
       </div>
     </div>
+
+    <table style="margin-top:40px">
+      <thead>
+        <tr><th style="width:250px">Transfer</th><th style="width:180px">Destination</th>
+          <th style="width:130px">Verdict</th><th>Value that arrived, against the value that left</th></tr>
+      </thead>
+      <tbody id="inv-rows"><tr><td colspan="4" class="dim">reading&hellip;</td></tr></tbody>
+    </table>
   </div>
 </section>
 
@@ -143,22 +156,28 @@
       <div class="eyebrow">When money may not move</div>
       <h2>The refusal is the product.</h2>
       <p class="lede">Every refusal carries a reason code and the evidence that produced it, taken from
-      the chain or from the destination's own answer.</p>
+      the chain or from the destination's own answer. The counts on the right are this instance's own
+      receipts and the transfers it is reading right now.</p>
     </div>
-    <table>
+
+    <div id="refusal-strip" class="strip"></div>
+
+    <table style="margin-top:36px">
       <thead>
-        <tr><th style="width:250px">Reason</th><th>What it means</th><th style="width:190px">Read from</th></tr>
+        <tr><th style="width:250px">Reason</th><th>What it means</th>
+          <th style="width:190px">Read from</th><th style="width:130px">Seen here</th></tr>
       </thead>
       <tbody>
-        <tr><td><span class="reason">ALREADY_DELIVERED</span></td><td class="why">The destination received this transfer already. A second delivery spends gas to fail, or double-sends under a local nonce bookkeeping system.</td><td class="dim">the destination's record</td></tr>
-        <tr><td><span class="reason">CALLER_RESTRICTED</span></td><td class="why">The message names a single address allowed to complete it. If that is not the executor, completion is not ours to attempt, and the rail names who can.</td><td class="dim">message field</td></tr>
-        <tr><td><span class="reason">ATTESTATION_PENDING</span></td><td class="why">The source chain has not finalised, so no attestation is signed. Nothing is wrong; it is early. The rail waits.</td><td class="dim">attestation service</td></tr>
-        <tr><td><span class="reason">RECIPIENT_MISMATCH</span></td><td class="why">The transfer being asked about is not the transfer in the message: a different recipient, amount or token. A request is not evidence.</td><td class="dim">message body</td></tr>
-        <tr><td><span class="reason">ROUTE_MISMATCH</span></td><td class="why">The message travels between domains other than the ones the caller named.</td><td class="dim">message header</td></tr>
-        <tr><td><span class="reason">MESSAGE_INCONSISTENT</span></td><td class="why">Our decode of the message and the attestation service's decode disagree, so the rail stops instead of deciding about a transfer nobody has described correctly.</td><td class="dim">two decodes</td></tr>
-        <tr><td><span class="reason">UNSUPPORTED_DOMAIN</span></td><td class="why">The transfer goes to a chain this rail does not watch, and an unwatched chain has no contract to call.</td><td class="dim">rail configuration</td></tr>
-        <tr><td><span class="reason">WRONG_TRANSMITTER</span></td><td class="why">The contract about to be called reports a different chain domain than the message's destination.</td><td class="dim">on-chain read</td></tr>
-        <tr><td><span class="reason">PREFLIGHT_REVERT</span></td><td class="why">The destination would reject the delivery for another reason. The rail carries that reason rather than replacing it.</td><td class="dim">destination simulation</td></tr>
+        <tr data-reason="ALREADY_DELIVERED"><td><span class="reason">ALREADY_DELIVERED</span></td><td class="why">The destination received this transfer already. A second delivery spends gas to fail, or double-sends under local bookkeeping.</td><td class="dim">the destination's record</td><td class="count"></td></tr>
+        <tr data-reason="CALLER_RESTRICTED"><td><span class="reason">CALLER_RESTRICTED</span></td><td class="why">The message names a single address allowed to complete it. If that is not the executor, completion is not ours to attempt, and the rail names who can.</td><td class="dim">message field</td><td class="count"></td></tr>
+        <tr data-reason="ATTESTATION_PENDING"><td><span class="reason">ATTESTATION_PENDING</span></td><td class="why">The source chain has not finalised, so no attestation is signed. Nothing is wrong; it is early. The rail waits.</td><td class="dim">attestation service</td><td class="count"></td></tr>
+        <tr data-reason="RECIPIENT_MISMATCH"><td><span class="reason">RECIPIENT_MISMATCH</span></td><td class="why">The transfer being asked about is not the transfer in the message: a different recipient, amount or token. A request is not evidence.</td><td class="dim">message body</td><td class="count"></td></tr>
+        <tr data-reason="ROUTE_MISMATCH"><td><span class="reason">ROUTE_MISMATCH</span></td><td class="why">The message travels between domains other than the ones the caller named.</td><td class="dim">message header</td><td class="count"></td></tr>
+        <tr data-reason="MESSAGE_INCONSISTENT"><td><span class="reason">MESSAGE_INCONSISTENT</span></td><td class="why">Two decodes of the same bytes disagree, so the rail stops instead of deciding about a transfer nobody has described correctly.</td><td class="dim">two decodes</td><td class="count"></td></tr>
+        <tr data-reason="UNSUPPORTED_DOMAIN"><td><span class="reason">UNSUPPORTED_DOMAIN</span></td><td class="why">The transfer goes to a chain this rail does not watch, and an unwatched chain has no contract to call.</td><td class="dim">rail configuration</td><td class="count"></td></tr>
+        <tr data-reason="DEPLOYMENT_ABSENT"><td><span class="reason">DEPLOYMENT_ABSENT</span></td><td class="why">The chain is watched, but this deployment of the protocol is not on it, so there is nothing to deliver the message to.</td><td class="dim">rail configuration</td><td class="count"></td></tr>
+        <tr data-reason="PREFLIGHT_REVERT"><td><span class="reason">PREFLIGHT_REVERT</span></td><td class="why">The destination would reject the delivery for another reason. The rail carries that reason rather than replacing it.</td><td class="dim">destination simulation</td><td class="count"></td></tr>
+        <tr data-reason="WRONG_TRANSMITTER"><td><span class="reason">WRONG_TRANSMITTER</span></td><td class="why">The contract about to be called reports a different chain domain than the message's destination.</td><td class="dim">on-chain read</td><td class="count"></td></tr>
       </tbody>
     </table>
   </div>
@@ -169,19 +188,23 @@
     <div class="section-head">
       <div class="eyebrow">How it executes</div>
       <h2>No key, no signing, no guessing.</h2>
+      <p class="lede">The rail holds no key and signs nothing. Every state-changing call goes through an
+      execution layer: simulate, read the verdict, then broadcast.</p>
     </div>
+
     <div class="cards three">
       <div class="card">
         <div class="eyebrow">Execution</div>
         <h3>Simulate, then broadcast</h3>
-        <p>Every state-changing call goes through the execution layer: simulate, read the verdict,
-        broadcast with an idempotency key derived from the transfer, then poll until the hash appears.</p>
+        <p>The call is simulated first, the destination's verdict is read, and only then is it broadcast —
+        with an idempotency key derived from the transfer. The status is polled until the hash appears.</p>
       </div>
       <div class="card">
         <div class="eyebrow">Payer side</div>
         <h3>Your wallet signs the burn</h3>
         <p>Creating a transfer is the payer's own transaction. They approve and they burn from their own
-        address, and the message names them as the recipient.</p>
+        address, and the message names them as the recipient. The rail is then looking at a transfer it
+        did not create.</p>
       </div>
       <div class="card">
         <div class="eyebrow">Record</div>
@@ -190,10 +213,11 @@
         The pair of them is the story: the delivery is why the refusal is correct.</p>
       </div>
     </div>
-    <div class="code" style="margin-top:24px">python3 scripts/astra_open_transfer.py --amount 1
-python3 scripts/astra_inflight.py --blocks 5000
-python3 scripts/astra_complete.py --burn-tx 0x... --source 6 --destination 0 --wait 300
-python3 scripts/prove_pairing.py</div>
+
+    <div class="card" style="margin-top:24px">
+      <div class="eyebrow">What this instance has actually done</div>
+      <dl class="kv" id="facts"><dt>reading</dt><dd>the chains&hellip;</dd></dl>
+    </div>
   </div>
 </section>
 

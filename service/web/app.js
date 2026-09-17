@@ -66,45 +66,185 @@ function chainOptions(selected) {
   }).join("");
 }
 
-function renderBand() {
+function renderBand(rates) {
   const host = el("band");
   if (!host || !ASTRAA.config) return;
   host.innerHTML = Object.values(ASTRAA.config.chains)
     .sort((a, b) => a.domain - b.domain)
-    .map((chain) => `
+    .map((chain) => {
+      const rate = rates && rates[String(chain.domain)];
+      const blocks = rate
+        ? (rate >= 2 ? `${rate.toFixed(1)} blocks/s` : `${(1 / rate).toFixed(1)}s blocks`)
+        : `domain ${chain.domain}`;
+      return `
       <div>
         <b>${chain.name}</b>
-        <span>domain ${chain.domain} &middot; chain ${chain.chain_id}</span>
-      </div>`).join("")
-    + `<div><b>destination contract</b><span>${short(Object.values(ASTRAA.config.chains)[0].messenger, 12, 6)}</span></div>`;
+        <span>domain ${chain.domain} &middot; ${blocks}</span>
+      </div>`;
+    }).join("");
+}
+
+/* --- the landing page's own numbers ----------------------------------- */
+
+/* Everything below is read from this instance while the page is open: the
+   invariant over the same span of time on every chain, what the rail has actually
+   decided, and what it has actually moved. Nothing on the page is a sample. */
+async function loadLandingInvariant(receipts) {
+  let pairing = null;
+  let inflight = null;
+  try {
+    pairing = await jget("/api/pairing?seconds=3600&limit=12");
+  } catch (err) {
+    text(el("inv-note"), `the invariant could not be read: ${err.message}`);
+  }
+  try {
+    inflight = await jget("/api/inflight?seconds=3600&limit=14");
+  } catch (err) {
+    /* the refusals panel simply shows what the receipts already said */
+  }
+  if (pairing) {
+    renderLandingInvariant(pairing);
+    renderFacts(pairing, receipts, inflight);
+    if (el("band")) renderBand(pairing.rates);
+  }
+  renderRefusals(receipts, inflight, pairing);
+}
+
+function renderLandingInvariant(out) {
+  const counts = { paired: 0, "in flight": 0, stranded: 0, unwatched: 0 };
+  (out.rows || []).forEach((row) => { counts[row.verdict] = (counts[row.verdict] || 0) + 1; });
+  text(el("l-paired"), String(counts.paired || 0));
+  text(el("l-inflight"), String(counts["in flight"] || 0));
+  text(el("l-stranded"), String(counts.stranded || 0));
+  text(el("l-unwatched"), String(counts.unwatched || 0));
+
+  const broken = out.broken || [];
+  text(el("inv-headline"), broken.length
+    ? `${broken.length} break${broken.length === 1 ? "" : "s"} in this window`
+    : `${out.rows ? out.rows.length : 0} transfers read, none broken`);
+
+  const span = out.span_seconds ? `${Math.round(out.span_seconds / 60)} minutes` : "the window";
+  const rates = out.rates
+    ? Object.values(ASTRAA.config.chains)
+        .sort((a, b) => a.domain - b.domain)
+        .map((c) => {
+          const rate = out.rates[String(c.domain)];
+          return rate ? `${c.name} ${rate >= 2 ? rate.toFixed(1) + " blocks/s" : (1 / rate).toFixed(1) + "s"}` : null;
+        }).filter(Boolean).join(" \u00b7 ")
+    : "";
+  text(el("inv-note"), `Paired from the destinations' own receipt events over the last ${span}. `
+    + (rates ? `Measured block time: ${rates}.` : ""));
+
+  const rows = (out.rows || []).filter((row) => row.verdict === "paired").slice(0, 5);
+  const tbody = el("inv-rows");
+  if (!tbody) return;
+  tbody.innerHTML = rows.length ? rows.map((row) => {
+    const measured = row.minted_amount !== null && row.minted_amount !== undefined;
+    const value = measured
+      ? `${fmtAmount(row.minted_amount)} of ${fmtAmount(row.expected_amount)} USDC`
+      : (row.value_matches === false ? "minted short of the burn" : "not measured");
+    return `<tr>
+      <td><span class="mono">${short(row.transfer_id, 16, 6)}</span>
+        <div class="why">${row.attestation} attestation &middot; ${row.layout || "unknown"} layout</div></td>
+      <td>${row.destination_name || "\u00b7"}</td>
+      <td><span class="tag ok">paired</span></td>
+      <td class="mono">${value}</td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="4" class="dim">Nothing is paired in this window: the latest transfers
+    are still waiting on their source chains.</td></tr>`;
+}
+
+function renderFacts(pairing, receipts, inflight) {
+  const host = el("facts");
+  if (!host) return;
+  const deliveries = receipts.filter((r) => r.transaction_link);
+  const refusals = receipts.filter((r) => r.decision && r.decision.action === "refuse");
+  const rows = pairing.rows || [];
+  const measured = rows.filter((r) => r.minted_amount !== null && r.minted_amount !== undefined);
+  const mintedTotal = measured.reduce((sum, r) => sum + r.minted_amount, 0);
+  const newest = deliveries[0];
+  const chains = ASTRAA.config ? Object.keys(ASTRAA.config.chains).length : 0;
+
+  host.innerHTML = `
+    <dt>Deliveries executed</dt>
+    <dd>${deliveries.length} \u2014 ${newest
+      ? `<a class="mono" href="${newest.transaction_link}" target="_blank" rel="noreferrer">${short(newest.transaction_hash, 14, 6)}</a> was the most recent`
+      : "none recorded here yet"}</dd>
+    <dt>Value measured as arrived</dt>
+    <dd>${measured.length ? `${fmtAmount(mintedTotal)} USDC across ${measured.length} paired transfers, read from each destination's token` : "nothing to measure in this window"}</dd>
+    <dt>Refusals recorded</dt>
+    <dd>${refusals.length} \u2014 every one with the evidence that produced it</dd>
+    <dt>Transfers in flight now</dt>
+    <dd>${inflight ? inflight.rows.length : "\u00b7"} across ${chains} chains</dd>
+    <dt>Window read</dt>
+    <dd>${pairing.span_seconds ? Math.round(pairing.span_seconds / 60) : "\u00b7"} minutes, the same span of history on every chain</dd>`;
+}
+
+function renderRefusals(receipts, inflight, pairing) {
+  const counted = {};
+  (receipts || []).forEach((r) => {
+    const reason = r.decision && r.decision.reason;
+    if (reason) counted[reason] = (counted[reason] || 0) + 1;
+  });
+  (inflight && inflight.rows ? inflight.rows : []).forEach((row) => {
+    const reason = row.decision && row.decision.reason;
+    if (reason) counted[reason] = (counted[reason] || 0) + 1;
+  });
+  (pairing && pairing.broken ? pairing.broken : []).forEach((row) => {
+    counted.STRANDED = (counted.STRANDED || 0) + 1;
+  });
+
+  document.querySelectorAll("tr[data-reason]").forEach((tr) => {
+    const n = counted[tr.dataset.reason];
+    const cell = tr.querySelector(".count");
+    if (cell) cell.innerHTML = n
+      ? `<span class="tag ${tr.dataset.reason === "ATTESTATION_PENDING" ? "wait" : "no"}">${n} seen</span>`
+      : `<span class="dim">none here</span>`;
+  });
+
+  const strip = el("refusal-strip");
+  if (!strip) return;
+  const recent = (inflight && inflight.rows ? inflight.rows : [])
+    .filter((row) => row.decision && row.decision.reason)
+    .slice(0, 6);
+  strip.innerHTML = recent.length
+    ? recent.map((row) => `
+        <span class="strip-item">
+          <span class="mono dim">${short(row.transfer_id, 14, 4)}</span>
+          <span class="tag ${row.decision.action === "complete" ? "ok" : (row.decision.action === "defer" ? "wait" : "no")}">${row.decision.reason}</span>
+        </span>`).join("")
+    : `<span class="dim">The rail is reading the chains now; its decisions will appear here.</span>`;
 }
 
 /* --- landing ---------------------------------------------------------- */
 
 Astra = {
   async landing() {
+    let receipts = [];
     try {
       const cfg = await loadConfig();
-      renderBand();
-      const chains = Object.values(cfg.chains).length;
       const chip = el("chip-wallet");
       if (chip) {
         chip.querySelector("b").textContent = "via the execution layer";
         chip.querySelector(".dot").classList.add("on");
       }
       text(el("foot-config"),
-        `${cfg.deployment} deployment \u00b7 watching domains ${cfg.watched_domains.join(", ")}`);
+        `${cfg.deployment} deployment \u00b7 ${cfg.read_only ? "read-only instance" : "signs locally"}`
+        + ` \u00b7 watching domains ${cfg.watched_domains.join(", ")}`);
+      if (el("band")) renderBand();
     } catch (err) {
       text(el("foot-config"), `configuration unavailable: ${err.message}`);
+      offlineBanner(err);
     }
     try {
-      const receipts = await jget("/api/receipts");
-      renderEvidence(receipts.receipts || []);
+      receipts = (await jget("/api/receipts")).receipts || [];
+      renderEvidence(receipts);
     } catch (err) {
       el("evidence").innerHTML = `<div class="err">receipts unavailable: ${err.message}</div>`;
       offlineBanner(err);
     }
     bindTrace();
+    await loadLandingInvariant(receipts);
   },
 
   async app() {
