@@ -339,9 +339,12 @@ def prepare(env: dict, body: dict) -> dict:
     try:
         payer.encode_recipient(recipient)
         ok_recipient = len(recipient) == 42 and recipient.startswith("0x")
-        detail = recipient if ok_recipient else f"{recipient} is not an address"
+        detail = recipient if ok_recipient else (
+            f"{recipient} is not an address" if recipient
+            else "a recipient address is required: connect a wallet here, or type one on the "
+                 "destination chain")
     except Exception:  # noqa: BLE001
-        detail = "a recipient address is required"
+        detail = "a recipient address is required: connect a wallet here, or type one on the "                 "destination chain"
     check("recipient", ok_recipient, detail)
 
     ok_caller = True
