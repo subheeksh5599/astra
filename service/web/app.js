@@ -163,7 +163,7 @@ function renderFacts(pairing, receipts, inflight) {
 
   host.innerHTML = `
     <div class="stat"><b>${deliveries.length}</b><span>deliveries executed</span></div>
-    <div class="stat ok"><b>${measured.length ? fmtAmount(total) : "\u00b7"}</b><span>USDC measured as arrived</span></div>
+    <div class="stat ok"><b>${measured.length ? fmtAmount(total) : "\u2014"}</b><span>USDC measured as arrived</span></div>
     <div class="stat"><b>${refusals.length}</b><span>refusals recorded</span></div>
     <div class="stat"><b>${inflight ? inflight.rows.length : "\u00b7"}</b><span>in flight right now</span></div>`;
 
