@@ -45,7 +45,8 @@
       <a class="rail-item" href="#receipts" data-pane="receipts"><span class="label">Receipts</span><span class="n" id="rail-c-receipts">&middot;</span></a>
 
       <div class="rail-group">Payer</div>
-      <a class="rail-item" href="#burn" data-pane="burn"><span class="label">Burn</span></a>
+      <a class="rail-item" href="#transfer" data-pane="transfer"><span class="label">Transfer</span></a>
+      <a class="rail-item" href="#my-transfers" data-pane="my-transfers"><span class="label">My transfers</span></a>
 
       
     </nav>
@@ -157,44 +158,77 @@
       </div>
     </section>
 
-    <section class="pane-body hidden" data-pane="burn" id="burn">
+    <section class="pane-body hidden" data-pane="transfer" id="transfer">
       <div class="panel">
         <div class="panel-head">
-          <h1>Burn</h1>
-          <span class="note">signed by the key this instance holds</span>
+          <h1>Create a transfer</h1>
+          <span class="note">your wallet signs; this page holds no key</span>
         </div>
         <div class="panel-body">
-          <div class="payer-box" id="payer-box">reading&hellip;</div>
-          <div class="form-grid">
+          <div id="wallet-card"></div>
+
+          <div class="form-grid" style="margin-top:20px">
             <div class="field">
-              <label for="payer-source">Source chain</label>
-              <select id="payer-source"></select>
+              <label for="tf-source">Source chain</label>
+              <select id="tf-source"></select>
             </div>
             <div class="field">
-              <label for="payer-destination">Destination chain</label>
-              <select id="payer-destination"></select>
+              <label for="tf-destination">Destination chain</label>
+              <select id="tf-destination"></select>
             </div>
             <div class="field">
-              <label for="payer-amount">Amount (USDC)</label>
-              <input id="payer-amount" value="0.5" inputmode="decimal">
+              <label for="tf-amount">Amount (USDC)</label>
+              <input id="tf-amount" inputmode="decimal" placeholder="0.5">
             </div>
             <div class="field">
-              <label for="payer-caller">Caller</label>
-              <input id="payer-caller" placeholder="optional">
+              <label for="tf-recipient">Recipient on the destination</label>
+              <input id="tf-recipient" placeholder="defaults to your wallet">
+            </div>
+            <div class="field">
+              <label for="tf-caller">Who may deliver it</label>
+              <input id="tf-caller" placeholder="anyone">
             </div>
           </div>
-          <div class="row">
-            <button class="btn primary" id="btn-open">Burn it</button>
-            <button class="btn outline" id="btn-open-finish">Burn and finish</button>
-            <button class="btn outline" id="btn-wallet-open" disabled>Approve and burn in your wallet</button>
+
+          <div class="row" style="margin-top:6px">
+            <button class="btn outline" id="btn-approve" disabled>Approve USDC</button>
+            <button class="btn primary" id="btn-burn" disabled>Burn and send</button>
+            <span class="dim" id="tf-action-note"></span>
           </div>
-          <p class="note" id="open-state" style="margin-top:14px">nothing sent yet</p>
-          <ol class="steps hidden" id="open-steps"></ol>
-          <div class="row" style="margin-top:12px">
-            <a class="btn outline sm hidden" id="open-link" target="_blank" rel="noreferrer">Burn</a>
-            <a class="btn outline sm hidden" id="mint-link" target="_blank" rel="noreferrer">Mint</a>
-            <a class="btn outline sm hidden" id="faucet" target="_blank" rel="noreferrer">Faucet</a>
-          </div>
+          <p class="note" id="tf-state">connect a wallet to begin</p>
+          <dl class="kv" style="margin-top:6px">
+            <dt id="tf-burn-hash-label">Source transaction</dt><dd id="tf-burn-hash">&mdash;</dd>
+            <dt>Approval transaction</dt><dd id="tf-approve-hash">&mdash;</dd>
+          </dl>
+          <ol class="steps" id="tf-steps"></ol>
+        </div>
+        <div class="panel-body">
+          <div class="eyebrow" style="margin-bottom:12px">Checks before signing</div>
+          <div id="tf-checks" class="checks"></div>
+        </div>
+      </div>
+
+      <div class="panel" id="tracking-panel">
+        <div class="panel-head">
+          <h1>Tracking</h1>
+          <span class="note mono" id="tf-track-id">no transfer yet</span>
+        </div>
+        <div class="panel-body">
+          <div id="tf-track"><div class="dim">A transfer you make appears here and is polled
+            until it reaches a terminal state.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="pane-body hidden" data-pane="my-transfers" id="my-transfers">
+      <div class="panel">
+        <div class="panel-head">
+          <h1>My transfers</h1>
+          <span class="note">the transfers the connected wallet signed, from this instance</span>
+          <button class="btn outline sm" id="btn-my-refresh">Read again</button>
+        </div>
+        <div class="panel-body flush">
+          <div id="my-list"><div class="dim" style="padding:18px 20px">Connect a wallet to see its transfers.</div></div>
         </div>
       </div>
     </section>
@@ -205,6 +239,7 @@
 
 <script src="vendor/ethers.umd.min.js"></script>
 <script src="app.js"></script>
+<script src="transfer.js"></script>
 <script>Astra.app();</script>
 </body>
 </html>

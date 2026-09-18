@@ -27,7 +27,7 @@ from urllib.parse import parse_qs, urlparse
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from astra import classifier, inflight, pairing, payer  # noqa: E402
+from astra import classifier, inflight, pairing, payer, transfers  # noqa: E402
 from astra.attestation import Attestation  # noqa: E402
 from astra.config import (CHAIN_IDS, DOMAIN_NAMES, MESSENGERS, USDC, attestation_base,  # noqa: E402
                           attestation_version, deployment, load_env, read_only, receipts_dir,
@@ -102,10 +102,25 @@ def public_config(env: dict) -> dict:
             "transmitter": transmitter(env, domain),
             "explorer": EXPLORERS.get(domain, ""),
         }
+    routes = []
+    # chains is keyed by string domain for JSON; the config lookups are keyed by int
+    domains = sorted(int(d) for d in chains)
+    for source in domains:
+        for destination in domains:
+            if source == destination:
+                continue
+            routes.append({
+                "source_domain": source,
+                "destination_domain": destination,
+                "ok": transmitter(env, destination) is not None,
+                "note": ("" if transmitter(env, destination) is not None
+                         else "this deployment is not on the destination chain"),
+            })
     return {
         "deployment": name,
         "read_only": read_only(env),
         "chains": chains,
+        "routes": routes,
         "watched_domains": sorted(chains),
         "attestation_base": attestation_base(env),
         "faucet": env.get("FAUCET_URL", ""),
@@ -172,6 +187,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.pairing(query)
         if path == "/api/receipts":
             return self.receipts()
+        if path == "/api/balance":
+            return self.balance(query, env)
+        if path == "/api/transfers":
+            return self.transfer_list(query, env)
+        if path.startswith("/api/transfer/"):
+            return self.transfer_get(path, env)
         if path.startswith("/api/receipt/"):
             return self.receipt(path.rsplit("/", 1)[-1])
         return self.static(path)
@@ -182,6 +203,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.complete(self.read_body())
         if parsed.path.rstrip("/") == "/api/open":
             return self.open_transfer(self.read_body())
+        if parsed.path.rstrip("/") == "/api/transfer/prepare":
+            return self.transfer_prepare(self.read_body())
+        if parsed.path.rstrip("/") == "/api/transfer/register":
+            return self.transfer_register(self.read_body())
+        if parsed.path.rstrip("/").endswith("/execute") and "/api/transfer/" in parsed.path:
+            return self.transfer_execute(self.read_body())
         return self.send_json({"error": "unknown route", "path": parsed.path}, 404)
 
     # -- handlers ---------------------------------------------------------
@@ -369,6 +396,121 @@ class Handler(BaseHTTPRequestHandler):
                 result["finish_error"] = str(exc)[:300]
                 step(f"finishing failed: {str(exc)[:200]}")
         return self.send_json(result)
+
+    # -- real transfers, the application's own boundary --------------------
+    def balance(self, query, env):
+        """Balances for whatever address asked, read from the chain it names.
+
+        The page never shows a balance it computed itself, and this is the only
+        place a balance comes from.
+        """
+        address = (query.get("address") or [""])[0].strip()
+        if not address.startswith("0x") or len(address) != 42:
+            return self.send_json({"error": "address must be a 20-byte address"}, 400)
+        try:
+            domain = int((query.get("domain") or ["0"])[0])
+        except ValueError:
+            return self.send_json({"error": "domain must be a number"}, 400)
+        if domain not in CHAIN_IDS or not supports(env, domain):
+            return self.send_json({"error": f"domain {domain} is not a chain this rail watches"}, 400)
+        rpc = Rpc(rpc_url(env, domain))
+        token = USDC[domain]
+        messenger = MESSENGERS[deployment(env)][domain]
+        out = {"address": address, "domain": domain, "chain_id": CHAIN_IDS[domain],
+               "name": DOMAIN_NAMES.get(domain, str(domain)), "token": token,
+               "messenger": messenger, "explorer": EXPLORERS.get(domain, "")}
+        try:
+            out["token_balance"] = rpc.balance_of(token, address)
+            out["native_balance"] = int(rpc.call("eth_getBalance", [address, "latest"]), 16)
+            raw = rpc.call_contract(token, "0xdd62ed3e" + "0" * 24 + address[2:].lower()
+                                    + "0" * 24 + messenger[2:].lower())
+            out["allowance"] = int(raw, 16) if raw and raw != "0x" else 0
+            out["head"] = rpc.block_number()
+        except Exception as exc:  # noqa: BLE001
+            return self.send_json({**out, "error": f"the chain did not answer: {str(exc)[:200]}"}, 502)
+        return self.send_json(out)
+
+    def transfer_prepare(self, body):
+        """Validate a transfer before a wallet is asked to sign anything."""
+        try:
+            prepared = transfers.prepare(load_env(), body or {})
+        except Exception as exc:  # noqa: BLE001
+            return self.send_json({"error": str(exc)[:300]}, 502)
+        return self.send_json(prepared, 200 if prepared.get("ok") else 422)
+
+    def transfer_register(self, body):
+        """Keep a burn the user just made, under the protocol's own identifier."""
+        env = load_env()
+        try:
+            registered = transfers.register(env, body or {})
+        except ValueError as exc:
+            return self.send_json({"error": str(exc)[:300]}, 400)
+        except Exception as exc:  # noqa: BLE001
+            return self.send_json({"error": str(exc)[:300]}, 502)
+        tid = registered["transfer_id"]
+        return self.send_json({**registered, "state": transfers.state_of(env, registered["record"])})
+
+    def transfer_list(self, query, env):
+        """This instance's transfers, or one wallet's, never anybody else's."""
+        owner = (query.get("address") or [""])[0].strip() or None
+        records = transfers.list_records(env, owner=owner)
+        out = []
+        for record in records[:100]:
+            item = transfers.summary(record)
+            item["source_link"] = explorer_link(item["source_domain"], item.get("source_tx"))
+            item["destination_link"] = explorer_link(item["destination_domain"],
+                                                     item.get("destination_tx"))
+            out.append(item)
+        return self.send_json({"transfers": out, "address": owner, "count": len(out)})
+
+    def transfer_get(self, path, env):
+        parts = [p for p in path.split("/") if p and p != "api"]
+        if len(parts) < 2 or parts[0] != "transfer":
+            return self.send_json({"error": "unknown route", "path": path}, 404)
+        transfer_id = parts[1]
+        want_evidence = len(parts) > 2 and parts[2] == "evidence"
+        record = transfers.load(env, transfer_id)
+        if not record:
+            return self.send_json({"error": "no such transfer", "transfer_id": transfer_id}, 404)
+        try:
+            state = transfers.state_of(env, record)
+        except Exception as exc:  # noqa: BLE001
+            return self.send_json({"error": str(exc)[:300], "transfer_id": transfer_id}, 502)
+        state["transfer_id"] = transfer_id
+        state["links"] = {
+            "source": explorer_link(int(record["source_domain"]), record.get("source_tx")),
+            "destination": explorer_link(state.get("destination", {}).get("domain"),
+                                         (state.get("delivered") or {}).get("transaction_hash")),
+            "contract": (f"{EXPLORERS.get(state.get('destination', {}).get('domain'), '')}"
+                         f"/address/{state.get('destination', {}).get('transmitter')}"
+                         if state.get("destination", {}).get("transmitter") else None),
+        }
+        if want_evidence:
+            return self.send_json(state)
+        return self.send_json({k: v for k, v in state.items() if k != "record"})
+
+    def transfer_execute(self, body):
+        """Attempt the delivery, after rereading everything the guards depend on."""
+        env = load_env()
+        transfer_id = str((body or {}).get("transfer_id") or "").strip()
+        record = transfers.load(env, transfer_id)
+        if not record:
+            return self.send_json({"error": "no such transfer", "transfer_id": transfer_id}, 404)
+        if executions_recently() >= EXECUTE_LIMIT:
+            return self.send_json({
+                "error": f"this instance has broadcast {EXECUTE_LIMIT} transfers in the last "
+                         f"{EXECUTE_WINDOW_SECONDS // 60} minutes",
+                "state": transfers.state_of(env, record)["state"], "attempted": False}, 429)
+        try:
+            result = transfers.execute(env, record)
+        except Exception as exc:  # noqa: BLE001
+            return self.send_json({"error": str(exc)[:300], "transfer_id": transfer_id,
+                                   "attempted": False}, 502)
+        if result.get("attempted"):
+            note_execution()
+        return self.send_json({**result, "transfer_id": transfer_id,
+                               "links": {"destination": (result.get("attempt") or {})
+                                         .get("transaction_link")}})
 
     def receipts(self):
         """Every receipt this instance can see, newest first.

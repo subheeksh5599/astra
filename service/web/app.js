@@ -10,6 +10,12 @@ const ASTRAA = {
   busy: false,
 };
 
+/* A top-level `const` in a classic script is a global lexical binding, not a
+   property of window, so a second script cannot reach it by name. Publishing the
+   same object makes `window.ASTRAA` and `ASTRAA` one and the same, which is what
+   the transfer application expects when it adds itself. */
+window.ASTRAA = ASTRAA;
+
 async function jget(path) {
   const res = await fetch(path, { headers: { accept: "application/json" } });
   const body = await res.json().catch(() => ({}));
@@ -271,19 +277,11 @@ Astra = {
     bindApp();
     try {
       const cfg = await loadConfig();
-      // The source defaults to the busiest chain this rail runs on, and the
-      // destination to another; both are selectable, because which chain is
-      // the source is the payer's business and their wallet's balance decides it.
-      el("payer-source").innerHTML = chainOptions(cfg.watched_domains[0]);
-      // The destination defaults to the chain this rail has delivered to most,
-      // and stays selectable: which chain is the destination is the caller's call.
-      el("payer-destination").innerHTML = chainOptions(
-        cfg.chains["0"] ? 0 : cfg.watched_domains[cfg.watched_domains.length - 1]);
-      await loadPayer();
       // the header states what this build is, not the hostname of its dependencies
-text(el("cfg-line"), `${cfg.deployment} deployment`);
-      const faucet = el("faucet");
-      if (cfg.faucet) { faucet.href = cfg.faucet; faucet.classList.remove("hidden"); }
+      text(el("cfg-line"), `${cfg.deployment} deployment`);
+      // the transfer application builds its routes from this configuration, so it
+      // starts after the configuration is in hand and never from a hardcoded list
+      if (ASTRAA.transfer) ASTRAA.transfer.init();
     } catch (err) {
       // The most likely reason a page that reads chains looks empty is that the
       // service behind it is not running. Say that, with the command, instead of
@@ -355,10 +353,6 @@ function renderTrace(receipt) {
 
 function bindApp() {
   el("btn-refresh").addEventListener("click", refresh);
-  el("btn-connect").addEventListener("click", connectWallet);
-  el("btn-open").addEventListener("click", () => openFromServer(false));
-  el("btn-open-finish").addEventListener("click", () => openFromServer(true));
-  el("btn-wallet-open").addEventListener("click", openTransfer);
   el("filter-blocks").addEventListener("change", refresh);
   el("btn-invariant").addEventListener("click", () => loadInvariant(true));
   const pass = el("btn-pass");
@@ -397,7 +391,8 @@ function showPane(name) {
     const summary = el("inv-summary");
     if (summary && summary.textContent.trim() === "not run yet") loadInvariant(false);
   }
-  if (name === "burn") loadPayer();
+  if (name === "transfer") ASTRAA.transfer && ASTRAA.transfer.init();
+  if (name === "my-transfers" && ASTRAA.transfer) ASTRAA.transfer.loadMyTransfers().catch(() => {});
   if (name === "receipts") loadLedger();
 }
 
@@ -700,205 +695,24 @@ function renderInvariant(out) {
     </tr>`).join("") : `<tr><td colspan="3" class="dim">no pass has been journaled yet</td></tr>`;
 }
 
-/* --- the payer side, on this machine ---------------------------------- */
-
-/* What the key this machine holds can pay with, and where. Asked before a
-   transfer is offered, so nobody fills a form and finds out at signing time. */
-async function loadPayer() {
-  const box = el("payer-box");
-  try {
-    const payer = await jget("/api/payer");
-    ASTRAA.payer = payer;
-    renderPayer(payer);
-  } catch (err) {
-    box.innerHTML = `<span class="dim">the payer side could not be read: ${err.message}</span>`;
-    el("btn-open").disabled = true;
-    el("btn-open-finish").disabled = true;
-  }
-}
-
-function renderPayer(payer) {
-  const box = el("payer-box");
-  if (!payer.configured) {
-    const hosted = ASTRAA.config && ASTRAA.config.read_only;
-    box.innerHTML = hosted
-      ? `<dl class="kv">
-           <dt>Burn key</dt><dd>not on this instance</dd>
-           <dt>Signed by</dt><dd>your wallet</dd>
-           <dt>Finish</dt><dd>through the execution layer</dd>
-         </dl>`
-      : `<dl class="kv">
-           <dt>Burn key</dt><dd>${payer.address ? stripAddrs(payer.address) : "none"}</dd>
-           <dt>Detail</dt><dd>${stripAddrs(payer.detail || "")}</dd>
-         </dl>`;
-    el("btn-open").disabled = true;
-    el("btn-open-finish").disabled = true;
-    return;
-  }
-  const chains = (payer.chains || []).filter((c) => c.usdc > 0 || c.native > 0);
-  const payable = (payer.chains || []).filter((c) => c.usdc > 0 && c.native > 0);
-  box.innerHTML = `
-    <div class="brief"><span class="mono">${short(payer.address, 12, 6)}</span>
-      <span class="dim"> pays from this machine</span></div>
-    <table class="mini">
-      <thead><tr><th>chain</th><th>USDC</th><th>gas</th><th></th></tr></thead>
-      <tbody>
-      ${chains.map((c) => `
-        <tr>
-          <td>${c.name}</td>
-          <td class="mono">${fmtAmount(c.usdc)}</td>
-          <td class="mono dim">${c.native ? (c.native / 1e18).toFixed(4) : "0"}</td>
-          <td>${c.usdc > 0 && c.native > 0 ? '<span class="tag ok">can pay here</span>'
-              : '<span class="tag">no</span>'}</td>
-        </tr>`).join("")}
-      </tbody>
-    </table>`;
-  if (payable.length) {
-    el("payer-source").innerHTML = chainOptions(payable[0].domain);
-  }
-  const ready = payable.length > 0;
-  el("btn-open").disabled = !ready;
-  el("btn-open-finish").disabled = !ready;
-}
-
-function renderSteps(steps) {
-  const list = el("open-steps");
-  if (!steps || !steps.length) {
-    list.classList.add("hidden");
-    list.innerHTML = "";
-    return;
-  }
-  list.classList.remove("hidden");
-  list.innerHTML = steps.map((entry) => `<li><span class="dim">${entry.at}</span> ${entry.step}</li>`).join("");
-}
-
-/* One click that ends in a real delivery: the burn is signed here, then the rail
-   waits for the source chain to finalise and hands the attestation over. The two
-   transactions are reported separately because they have different signers. */
-async function openFromServer(finish) {
-  clearError();
-  renderSteps([]);
-  el("open-link").classList.add("hidden");
-  el("mint-link").classList.add("hidden");
-  const amount = Number(el("payer-amount").value.trim());
-  const source = Number(el("payer-source").value);
-  const destination = Number(el("payer-destination").value);
-  const caller = el("payer-caller").value.trim();
-  if (!(amount > 0)) { showError("amount must be greater than zero"); return; }
-
-  const buttons = [el("btn-open"), el("btn-open-finish")];
-  buttons.forEach((b) => { b.disabled = true; });
-  const started = Date.now();
-  const label = finish ? "burning, then waiting for the attestation" : "burning";
-  text(el("open-state"), `${label}\u2026`);
-  const ticker = setInterval(() => {
-    text(el("open-state"), `${label}\u2026 ${Math.round((Date.now() - started) / 1000)}s`);
-  }, 1000);
-  try {
-    const out = await jpost("/api/open", {
-      amount, source_domain: source, destination_domain: destination,
-      caller: caller || null, finish, wait_seconds: 900,
-    });
-    renderSteps(out.steps || []);
-    const transfer = out.transfer || {};
-    text(el("open-state"), `burned ${fmtAmount(transfer.amount)} USDC on ${source} \u2192 ${destination}`);
-    const burn = el("open-link");
-    burn.href = out.burn_link || "#";
-    burn.classList.remove("hidden");
-    if (out.receipt) {
-      showReceipt(out.receipt);
-      const mint = el("mint-link");
-      if (out.mint_link) { mint.href = out.mint_link; mint.classList.remove("hidden"); }
-    }
-    if (out.finish_error) showError(`the transfer is in flight, but finishing failed: ${out.finish_error}`);
-    await refresh();
-    await loadLedger();
-    await loadPayer();
-  } catch (err) {
-    showError(`could not open the transfer: ${err.message}`);
-    text(el("open-state"), "nothing sent");
-  }
-  clearInterval(ticker);
-  buttons.forEach((b) => { b.disabled = false; });
-}
-
-/* --- the payer side, signed in the browser ---------------------------- */
-
-async function connectWallet() {
-  clearError();
-  if (!window.ethereum) {
-    showError("No browser wallet found. Creating a transfer needs a wallet that can sign; the rail's own side does not.");
-    return;
-  }
-  try {
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    const accounts = await provider.send("eth_requestAccounts", []);
-    const network = await provider.getNetwork();
-    ASTRAA.signer = await provider.getSigner();
-    ASTRAA.address = accounts[0];
-    text(el("wallet-state"), `${short(ASTRAA.address, 8, 6)} on chain ${network.chainId}`);
-    el("btn-open").disabled = false;
-  } catch (err) {
-    showError(`wallet refused: ${err.message}`);
-  }
-}
-
-async function openTransfer() {
-  clearError();
-  const cfg = ASTRAA.config;
-  const sourceDomain = Number(el("payer-source").value);
-  const source = cfg.chains[String(sourceDomain)];
-  if (!source) { showError("pick a source chain the rail watches"); return; }
-  const destinationDomain = Number(el("payer-destination").value);
-  const amount = BigInt(Math.round(Number(el("payer-amount").value.trim()) * 1e6));
-  const caller = el("payer-caller").value.trim();
-  if (!amount || amount <= 0n) { showError("amount must be greater than zero"); return; }
-
-  const provider = new ethers.BrowserProvider(window.ethereum);
-  const network = await provider.getNetwork();
-  if (Number(network.chainId) !== source.chain_id) {
-    showError(`switch your wallet to chain ${source.chain_id} (${source.name}) to create the transfer`);
-    return;
-  }
-  const signer = await provider.getSigner();
-  const usdc = new ethers.Contract(source.usdc, [
-    "function approve(address spender, uint256 amount) returns (bool)",
-    "function allowance(address owner, address spender) view returns (uint256)",
-  ], signer);
-  const messengerAbi = cfg.deployment === "v1"
-    ? ["function depositForBurn(uint256 amount, uint32 destinationDomain, bytes32 mintRecipient, address burnToken)"]
-    : ["function depositForBurn(uint256 amount, uint32 destinationDomain, bytes32 mintRecipient, address burnToken, bytes32 destinationCaller, uint256 maxFee, uint32 minFinalityThreshold)"];
-  const messenger = new ethers.Contract(source.messenger, messengerAbi, signer);
-
-  el("btn-open").disabled = true;
-  text(el("open-state"), "approving\u2026");
-  try {
-    const allowance = await usdc.allowance(ASTRAA.address, source.messenger);
-    if (allowance < amount) {
-      const approveTx = await usdc.approve(source.messenger, amount);
-      text(el("open-state"), `approval sent ${short(approveTx.hash, 12, 6)}\u2026 waiting`);
-      await approveTx.wait();
-    }
-    const recipient32 = ethers.zeroPadValue(ASTRAA.address, 32);
-    const caller32 = caller ? ethers.zeroPadValue(caller, 32) : ethers.ZeroHash;
-    text(el("open-state"), "burning on the source chain\u2026");
-    const burnTx = cfg.deployment === "v1"
-      ? await messenger.depositForBurn(amount, destinationDomain, recipient32, source.usdc)
-      : await messenger.depositForBurn(amount, destinationDomain, recipient32, source.usdc,
-                                       caller32, amount / 1000n, 1000);
-    text(el("open-state"), `transfer opened ${short(burnTx.hash, 12, 6)}\u2026 waiting for the source chain`);
-    await burnTx.wait();
-    text(el("open-state"), `in flight: ${burnTx.hash}`);
-    const link = el("open-link");
-    link.href = explorerLink(source, burnTx.hash);
-    link.classList.remove("hidden");
-    await refresh();
-  } catch (err) {
-    showError(`could not open the transfer: ${err.message}`);
-    text(el("open-state"), "not opened");
-  }
-  el("btn-open").disabled = false;
-}
+/* What the transfer application reads from the page: the chains the rail is
+   configured for, and the answers that only the configuration can give. */
+ASTRAA.chains = () => (ASTRAA.config && ASTRAA.config.chains) || {};
+ASTRAA.chainForDomain = (domain) => ASTRAA.chains()[String(domain)] || null;
+ASTRAA.nameOf = (domain) => {
+  const chain = ASTRAA.chainForDomain(domain);
+  return chain ? chain.name : `domain ${domain}`;
+};
+ASTRAA.domainForChainId = (chainId) => {
+  const hit = Object.values(ASTRAA.chains())
+    .find((chain) => Number(chain.chain_id) === Number(chainId));
+  return hit ? hit.domain : null;
+};
+ASTRAA.explorerOf = (domain) => {
+  const chain = ASTRAA.chainForDomain(domain);
+  return chain ? chain.explorer : null;
+};
+ASTRAA.showPane = showPane;
 
 function explorerLink(chain, hash) {
   const base = chain.chain_id === 84532 ? "https://sepolia.basescan.org"
