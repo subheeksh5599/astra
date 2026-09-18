@@ -8,34 +8,189 @@ A cross-chain transfer leaves one chain and arrives on another, unless it does n
 ends, finishes what is in flight through an execution layer that holds the keys, and refuses, by name,
 what may not move.
 
-[![Network](https://img.shields.io/badge/watching-5%20testnets%20%C2%B7%202%20live%20deployments-0052FF?labelColor=0e1013)](astra/config.py)
-[![tests](https://github.com/subheeksh5599/astra/actions/workflows/tests.yml/badge.svg)](https://github.com/subheeksh5599/astra/actions/workflows/tests.yml)
-[![Tests](https://img.shields.io/badge/tests-68%20passing-2ecc71?labelColor=0e1013)](tests/)
+[![demo](https://img.shields.io/badge/watch%20the%20demo-2m22-FF0000?labelColor=0e1013&logo=youtube&logoColor=white)](https://youtu.be/PuOpOkQNzcI)
 [![Live](https://img.shields.io/badge/live-astra--rail.vercel.app-000000?labelColor=0e1013)](https://astra-rail.vercel.app)
+[![Network](https://img.shields.io/badge/watching-5%20testnets%20%C2%B7%202%20live%20deployments-0052FF?labelColor=0e1013)](astra/config.py)
+[![Tests](https://img.shields.io/badge/tests-68%20passing-2ecc71?labelColor=0e1013)](tests/)
 [![Invariant](https://img.shields.io/badge/invariant-executable%20%2B%20quantitative-3f9d8f?labelColor=0e1013)](scripts/prove_pairing.py)
 [![License](https://img.shields.io/badge/license-MIT-yellow?labelColor=0e1013)](LICENSE)
 
-<img src="service/web/assets/control-surface.png" width="880" alt="The control surface: five chains watched, the transfers in flight, and the decision behind each one">
+<a href="https://youtu.be/PuOpOkQNzcI"><img src="https://img.youtube.com/vi/PuOpOkQNzcI/maxresdefault.jpg" width="820" alt="Watch the demo: a transfer read without spending, a refusal with a name, a delivery through the execution layer"></a>
 
 </div>
 
 ---
 
+## Watch the demo
+
+**[youtu.be/PuOpOkQNzcI](https://youtu.be/PuOpOkQNzcI)** — 2m22, recorded on the live instance, browser
+only, nothing typed in a terminal. In order: a transfer read and answered without spending anything, a
+refusal that names its reason and offers no button for it, a delivery **broadcast through the execution
+layer while it runs**, and the invariant measured from both chains. The mint that happens in the video is
+[`0xbe536f01…`](https://sepolia.etherscan.io/tx/0xbe536f012f507f9e5b5b7d4e28e1efb921538c72f38883ae37d45e4744f9bac2)
+on Ethereum Sepolia, and it is in the live ledger at
+[`/api/receipts`](https://astra-rail.vercel.app/api/receipts).
+
+**Jump to:** [Live](#live) · [The gap](#the-gap-in-one-paragraph) · [The invariant](#the-invariant) ·
+[Refusals](#refusals-have-names) · [The surface](#the-control-surface) · [Evidence](#evidence-on-the-chains) ·
+[Run it](#run-it) · [Limits](#limitations-and-roadmap)
+
+## Table of contents
+
+- [Live](#live)
+- [The gap in one paragraph](#the-gap-in-one-paragraph)
+- [The invariant](#the-invariant)
+- [Refusals have names](#refusals-have-names)
+- [The control surface](#the-control-surface)
+- [How it executes](#how-it-executes)
+- [Five chains, two deployments, one rail](#five-chains-two-deployments-one-rail)
+- [Evidence, on the chains](#evidence-on-the-chains)
+- [Layout](#layout)
+- [Run it](#run-it)
+- [Deploying it](#deploying-it)
+- [Limitations and roadmap](#limitations-and-roadmap)
+
 ## Live
 
 **https://astra-rail.vercel.app** — the same surface, hosted, reading the same five testnets.
 
-It is read-only by design and says so on the page: a hosted bundle holds no key, so nothing there
-signs a burn. Value still moves through it — the rail finishes transfers that are in flight, including
-ones somebody else made — and creating a transfer there is signed in the visitor's own wallet. The
-receipts below were written by local runs and by the hosted instance, and the page shows both.
+It is read-only by design and says so on the page: a hosted bundle holds no key, so nothing there signs
+a burn. Value still moves through it — the rail finishes transfers that are in flight, including ones
+somebody else made — and creating a transfer there is signed in the visitor's own wallet. The receipts
+below were written by local runs and by the hosted instance, and the page shows both.
 
 | Through the deployment | |
 |---|---|
 | A transfer opened locally, finished by the hosted rail | burn [`0x969353ce…`](https://sepolia.basescan.org/tx/0x969353cef2a024279464103f3cd804ed77559997ec7daf729edd606fd7b35f6f) → mint [`0x01aebb10…`](https://sepolia.etherscan.io/tx/0x01aebb103acd93a992e6f0744f7d2bad9a4584e54e7fcb487fb00e56d312a6eb) |
 | Its mint measured from the token's own transfer event | 0.049994 of 0.049994 USDC, 20 seconds after the request |
+| A transfer opened for the recording, finished during the recording | burn [`0x0b5f20c8…`](https://sepolia.basescan.org/tx/0x0b5f20c8b9d2f6972cff701708246638ff32bcf928a50bbcbbd534356c1cbcc8) → mint [`0xbe536f01…`](https://sepolia.etherscan.io/tx/0xbe536f012f507f9e5b5b7d4e28e1efb921538c72f38883ae37d45e4744f9bac2) |
 
-## Live status
+## The gap in one paragraph
+
+Moving value between two chains is two transactions, not one. The first burns on the source chain and
+announces a message. The second hands a signed attestation to the destination contract, which mints.
+Between them the value exists nowhere spendable: it has left the source and it has not arrived. That
+window closes only if somebody is watching both ends. A rail that watches one end cannot tell a transfer
+that has arrived from one that is stuck, and a rail that keeps its own list cannot tell that somebody
+else already delivered the transfer it is about to send.
+
+## The invariant
+
+    One burn, exactly one mint.
+
+For every message the source chain announced, the destination chain received it once, or it has not
+received it yet, and there is no third possibility. `scripts/prove_pairing.py` reads both chains and says
+which happened, per transfer, including how much value arrived:
+
+    transfer                     amount  destination        attestation verdict
+    6:931762504361313534443157 0.050000  ethereum-sepolia   final      paired  mint 0x09144b02b95f  minted 0.049994 of 0.049994
+    6:546510176608399233227111 1.000000  ethereum-sepolia   final      stranded
+    2:179291946512626312961173 1.000000  26                 final      unwatched
+    ...
+    1 paired, 1 stranded, 10 unwatched
+
+Delivery is read from the destination's own receipt event, keyed by the source domain and the nonce that
+event carries — the same statement on both live deployments, which is why the older one can be paired
+here even though its storage does not answer the newer contract's replay question.
+
+The invariant can break in three ways, and all three are checked:
+
+    stranded        the attestation is signed and nothing has received it: value that could move
+    received twice  the destination named the same nonce twice: value that moved twice
+    short           the mint is less than the burn, by more than the protocol's own fee
+
+It exits non-zero on any of them, so wiring it to a job makes "money is stuck" a failed job rather than a
+paragraph. `scripts/astra_watch.py` is that job: it runs the same pass on an interval and writes one
+journal entry per pass, and it does not spend anything. The control surface shows the same read —
+counters, each paired row's measured value, the places it is broken, and the journal of scheduled
+passes — so the invariant is visible without a terminal. Finishing a transfer stays an explicit act on
+purpose: a process that moves money unattended is the thing this rail exists to replace with something
+you can ask about.
+
+## Refusals have names
+
+The refusal is the product. Every one carries a reason code and the evidence that produced it, and the
+surface only offers an action when the protocol has not already ruled it out — a refusal read from the
+destination's own state renders **not ours to attempt**, with no button to press.
+
+| Reason | Meaning | Read from |
+|---|---|---|
+| `ALREADY_DELIVERED` | the destination already holds this transfer | the destination contract's record for the nonce |
+| `CALLER_RESTRICTED` | the message names one allowed caller and it is not the executor | the message's `destinationCaller` |
+| `ATTESTATION_PENDING` | the source has not finalised, so nothing is signed yet | the attestation service |
+| `RECIPIENT_MISMATCH` / `AMOUNT_MISMATCH` / `TOKEN_MISMATCH` | the request does not describe the transfer in the message | the message body |
+| `ROUTE_MISMATCH` | the message travels between other domains than the caller named | the message header |
+| `MESSAGE_INCONSISTENT` | our decode and the service's decode of the same bytes disagree | two decodes |
+| `WRONG_TRANSMITTER` | the contract about to be called serves another domain | an on-chain read |
+| `UNSUPPORTED_DOMAIN` | the transfer goes somewhere this rail does not watch | rail configuration |
+| `DEPLOYMENT_ABSENT` | the rail watches the chain, but this deployment is not on it | rail configuration |
+| `PREFLIGHT_REVERT` | the destination would reject the delivery for another reason | the destination's simulation |
+| `UNREADABLE_MESSAGE` | the message body could not be decoded, so nothing is attempted | our decoder |
+
+Each of these was produced against the live destination, not constructed for a test:
+
+| Refusal | How it was produced |
+|---|---|
+| `ALREADY_DELIVERED` | the same completed transfer asked twice; the destination contract reports the nonce as used |
+| `CALLER_RESTRICTED` | a transfer whose message names a single allowed caller; the rail names that address and does not attempt |
+| `NOT_FOUND` | a source transaction with no transfer behind it |
+| `RECIPIENT_MISMATCH` | a request naming a recipient the message does not carry |
+| `ATTESTATION_PENDING` | a transfer read before the source chain finalised; the rail defers and waits |
+| `UNSUPPORTED_DOMAIN` | a transfer travelling to a chain this rail does not serve, named rather than attempted |
+
+## The control surface
+
+The rail's whole state, read from the chains on demand — no indexer is asked what is pending, and nothing
+this rail wrote down is consulted.
+
+**Transfers in flight.** Every transfer the source logs announced, each with a verdict, the evidence
+behind it, and at most one action. The number row is a total and the three parts of it, drawn as a bar
+from the same numbers; the rail on the left carries the live counts.
+
+![Transfers in flight](service/web/assets/shot-transfers.webp)
+
+**The invariant.** The same read `prove_pairing.py` makes, per transfer, with the value that arrived
+measured against the value that left.
+
+![The invariant](service/web/assets/shot-invariant.webp)
+
+**Receipts.** One per decision — deliveries and refusals alike — each carrying what was seen, what was
+decided, and what moved.
+
+![Receipts](service/web/assets/shot-receipts.webp)
+
+## How it executes
+
+The rail holds no key and signs nothing itself. Every state-changing call goes through an execution
+layer: simulate first, read the verdict, broadcast with an idempotency key derived from the transfer,
+then poll until the transaction hash appears. The destination's simulation is not decoration — it is
+where the already-delivered refusal comes from, before anything is spent.
+
+The payer side stays in the wallet of whoever is paying. Creating a transfer is their transaction: they
+approve and they burn from their own address, and the message names them as the recipient. The surface
+does both halves: from the key this machine holds (the panel reports what that address holds on each
+chain and offers only the chains it can actually pay on) or from a browser wallet.
+
+## Five chains, two deployments, one rail
+
+    domain 0  ethereum-sepolia   11155111
+    domain 2  optimism-sepolia   11155420
+    domain 3  arbitrum-sepolia   421614
+    domain 6  base-sepolia       84532
+    domain 7  polygon-amoy       80002
+
+Every one of those is a chain the execution layer can deliver on and the protocol is deployed on; the
+addresses are in `astra/config.py`, and each destination contract is asked for the domain it serves
+before it is called. A chain that this particular deployment is not on is refused with
+`DEPLOYMENT_ABSENT` instead of being attempted and failing.
+
+Two versions of the protocol are live at once. The later one accepts a fee cap and a finality threshold,
+so a transfer can be attested as soon as the source block is confirmed; the earlier one waits for full
+finality. **Both message layouts are decoded field by field** — the offsets were derived from real
+messages and then cross-checked against the messenger's own deposit event on the source chain, and the
+test suite pins each layout against two real transfers.
+
+## Evidence, on the chains
 
 Everything below was produced by this repository against public testnets. Links are to the chains
 themselves, not to this project.
@@ -60,130 +215,6 @@ fast threshold, 0.049994 minted — and the rail reads the minted figure out of 
 event rather than assuming it, so `prove_pairing.py` reports the pair as `minted 0.049994 of 0.049994`
 for each one.
 
-Refusals proved against the live destination, each with the destination's own words as evidence:
-
-| Refusal | How it was produced |
-|---|---|
-| `ALREADY_DELIVERED` | the same completed transfer asked twice; the destination contract reports the nonce as used |
-| `CALLER_RESTRICTED` | a transfer whose message names a single allowed caller; the rail names that address and does not attempt |
-| `NOT_FOUND` | a source transaction with no transfer behind it |
-| `RECIPIENT_MISMATCH` | a request naming a recipient the message does not carry |
-| `ATTESTATION_PENDING` | a transfer read before the source chain finalised; the rail defers and waits |
-| `UNSUPPORTED_DOMAIN` | a transfer travelling to a chain this rail does not serve, named rather than attempted |
-
-Receipts for these are in [`artifacts/receipts/`](artifacts/receipts). The pairing proof is in
-[`artifacts/pairing.json`](artifacts/pairing.json), and every scheduled pass is journaled under
-[`artifacts/watch/`](artifacts/watch).
-
----
-
-## The gap in one paragraph
-
-Moving value between two chains is two transactions, not one. The first burns on the source chain and
-announces a message. The second hands a signed attestation to the destination contract, which mints.
-Between them the value exists nowhere spendable: it has left the source and it has not arrived. That
-window closes only if somebody is watching both ends. A rail that watches one end cannot tell a
-transfer that has arrived from one that is stuck, and a rail that keeps its own list cannot tell that
-somebody else already delivered the transfer it is about to send.
-
-## The invariant
-
-    One burn, exactly one mint.
-
-For every message the source chain announced, the destination chain received it once, or it has not
-received it yet, and there is no third possibility. `scripts/prove_pairing.py` reads both chains and
-says which happened, per transfer, including how much value arrived:
-
-    transfer                     amount  destination        attestation verdict
-    6:931762504361313534443157 0.050000  ethereum-sepolia   final      paired  mint 0x09144b02b95f  minted 0.049994 of 0.049994
-    6:546510176608399233227111 1.000000  ethereum-sepolia   final      stranded
-    2:179291946512626312961173 1.000000  26                 final      unwatched
-    ...
-    1 paired, 1 stranded, 10 unwatched
-
-Delivery is read from the destination's own receipt event, keyed by the source domain and the nonce
-that event carries — the same statement on both live deployments, which is why the older one can be
-paired here even though its storage does not answer the newer contract's replay question.
-
-The invariant can break in three ways, and all three are checked:
-
-    stranded        the attestation is signed and nothing has received it: value that could move
-    received twice  the destination named the same nonce twice: value that moved twice
-    short           the mint is less than the burn, by more than the protocol's own fee
-
-It exits non-zero on any of them, so wiring it to a job makes "money is stuck" a failed job rather
-than a paragraph. `scripts/astra_watch.py` is that job: it runs the same pass on an interval and
-writes one journal entry per pass, and it does not spend anything. The control surface shows the same
-read — counters, each paired row's measured value, the places it is broken, and the journal of
-scheduled passes — so the invariant is visible without a terminal. Finishing a transfer stays an
-explicit act on purpose — a process that moves money unattended is the thing this rail exists to
-replace with something you can ask about.
-
-## What the rail does
-
-    observe   read the source chain's own log stream; read the destination's own record
-    decide    complete, defer, or refuse — a pure function over what was observed
-    act       hand the signed attestation to the destination through the execution layer
-    record    write a receipt: what was seen, what was decided, what moved, and in what order
-
-The refusal is the product. Every one carries a reason code and the evidence that produced it:
-
-| Reason | Meaning | Read from |
-|---|---|---|
-| `ALREADY_DELIVERED` | the destination already holds this transfer | the destination contract's record for the nonce |
-| `CALLER_RESTRICTED` | the message names one allowed caller and it is not the executor | the message's `destinationCaller` |
-| `ATTESTATION_PENDING` | the source has not finalised, so nothing is signed yet | the attestation service |
-| `RECIPIENT_MISMATCH` / `AMOUNT_MISMATCH` / `TOKEN_MISMATCH` | the request does not describe the transfer in the message | the message body |
-| `ROUTE_MISMATCH` | the message travels between other domains than the caller named | the message header |
-| `MESSAGE_INCONSISTENT` | our decode and the service's decode of the same bytes disagree | two decodes |
-| `WRONG_TRANSMITTER` | the contract about to be called serves another domain | an on-chain read |
-| `UNSUPPORTED_DOMAIN` | the transfer goes somewhere this rail does not watch | rail configuration |
-| `DEPLOYMENT_ABSENT` | the rail watches the chain, but this deployment is not on it | rail configuration |
-| `PREFLIGHT_REVERT` | the destination would reject the delivery for another reason | the destination's simulation |
-| `UNREADABLE_MESSAGE` | the message body could not be decoded, so nothing is attempted | our decoder |
-
-## Doing a transfer
-
-The control surface does both halves, and both are real transactions:
-
-- **From the key this machine holds.** The panel reports what that address holds on each chain and
-  where, offers only the chains it can actually pay on, and signs the approval and the burn itself. With
-  `Burn and finish`, the same call then waits for the source chain to finalise, hands the signed
-  attestation to the destination through the execution layer, and shows the burn link, the mint link and
-  the receipt — one burn and one mint, reported separately because they have different signers.
-- **Or in your own wallet.** The same burn, signed by a browser wallet instead.
-
-Either way the rail is looking at a transfer it did not create, which is the only interesting case.
-
-## How it executes
-
-The rail holds no key and signs nothing itself. Every state-changing call goes through an execution
-layer: simulate first, read the verdict, broadcast with an idempotency key derived from the transfer,
-then poll until the transaction hash appears. The destination's simulation is not decoration — it is
-where the already-delivered refusal comes from, before anything is spent.
-
-The payer side stays in the wallet of whoever is paying. Creating a transfer is their transaction:
-they approve and they burn from their own address, and the message names them as the recipient.
-
-## Five chains, two deployments, one rail
-
-    domain 0  ethereum-sepolia   11155111
-    domain 2  optimism-sepolia   11155420
-    domain 3  arbitrum-sepolia   421614
-    domain 6  base-sepolia       84532
-    domain 7  polygon-amoy       80002
-
-Every one of those is a chain the execution layer can deliver on and the protocol is deployed on; the
-addresses are in `astra/config.py`, and each destination contract is asked for the domain it serves
-before it is called. A chain that this particular deployment is not on is refused with
-`DEPLOYMENT_ABSENT` instead of being attempted and failing.
-
-Two versions of the protocol are live at once. The later one accepts a fee cap and a finality
-threshold, so a transfer can be attested as soon as the source block is confirmed; the earlier one
-waits for full finality. **Both message layouts are now decoded field by field** — the offsets were
-derived from real messages and then cross-checked against the messenger's own deposit event on the
-source chain, and the test suite pins each layout against two real transfers.
-
 ## Layout
 
     astra/config.py          chains, domains, contract addresses, environment
@@ -200,13 +231,13 @@ source chain, and the test suite pins each layout against two real transfers.
     service/                 the HTTP surface and the browser control surface
     api/index.py             the hosted entry point: the same surface, read-only, no key
     vercel.json              the deployment: one function for every route, 60s, bundle includes
-    tests/                   64 tests, including the captured messages this project produced
+    tests/                   68 tests, including the captured messages this project produced
 
 ## Run it
 
 ```bash
 cp .env.example .env          # fill in the executor key and the payer wallet
-uv venv .venv && uv pip install --python .venv/bin/python pytest   # 64 tests
+uv venv .venv && uv pip install --python .venv/bin/python pytest   # 68 tests
 .venv/bin/python -m pytest tests -q
 
 .venv/bin/python scripts/astra_inflight.py --blocks 4000
@@ -218,7 +249,7 @@ uv venv .venv && uv pip install --python .venv/bin/python pytest   # 64 tests
 .venv/bin/python service/astra_service.py --port 8099                   # open http://127.0.0.1:8099
 ```
 
-## Evidence in the repository
+Evidence the runs leave behind, all committed:
 
 - `artifacts/receipts/` — one receipt per decision, including the refusals, each carrying the evidence
 - `artifacts/pairing.json` — the invariant's answer for a window of transfers, with amounts measured
@@ -231,29 +262,29 @@ uv venv .venv && uv pip install --python .venv/bin/python pytest   # 64 tests
 ## Deploying it
 
 The repository ships the deployment. `api/index.py` is the hosted entry point: it sets the instance
-read-only, points receipts at a writable directory, and hands every route to the same service the
-local run uses, so a bug found locally is a bug here. `vercel.json` sends everything to that function
-and includes the package, the service and the committed artifacts in the bundle.
+read-only, points receipts at a writable directory, and hands every route to the same service the local
+run uses, so a bug found locally is a bug here. `vercel.json` sends everything to that function and
+includes the package, the service and the committed artifacts in the bundle.
 
     vercel link --project astra
     printf '%s' "$KH_API_KEY" | vercel env add KH_API_KEY production
     vercel deploy --prod --yes
     vercel alias set <the deployment URL that was just printed> astra-rail.vercel.app
 
-That last line matters: a manual alias pins one deployment, so it has to be re-pointed
-after every production deploy or the pretty URL keeps serving the previous build. Verify by
-grepping the served HTML for something only the new build has, not by status code.
+That last line matters: a manual alias pins one deployment, so it has to be re-pointed after every
+production deploy or the pretty URL keeps serving the previous build. Verify by grepping the served HTML
+for something only the new build has, not by status code.
 
 Three environment variables are all it needs: the execution layer's key, the attestation base, and
-`ASTRA_READ_ONLY=1`. No paying key is set there, which is why the page tells a visitor to sign the
-burn in their own wallet — and why an endpoint anyone can reach can spend the executor's gas only
-six times in ten minutes.
+`ASTRA_READ_ONLY=1`. No paying key is set there, which is why the page tells a visitor to sign the burn
+in their own wallet — and why an endpoint anyone can reach can spend the executor's gas only six times in
+ten minutes.
 
 ## Limitations and roadmap
 
-Read [docs/LIMITATIONS.md](docs/LIMITATIONS.md) before trusting this with anything. The short version:
-it is a testnet rail, it watches five chains, it decodes both live message layouts, and it holds no
-key. What it does not do, it refuses by name rather than approximating.
+Read [docs/LIMITATIONS.md](docs/LIMITATIONS.md) before trusting this with anything. The short version: it
+is a testnet rail, it watches five chains, it decodes both live message layouts, and it holds no key.
+What it does not do, it refuses by name rather than approximating.
 
 Roadmap: mainnet configuration, domains beyond the ones the execution layer can currently reach, and a
 hosted read-only surface so the pairing proof can be watched without running anything.
