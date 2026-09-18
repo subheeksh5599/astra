@@ -168,6 +168,11 @@
           <button class="btn primary" id="btn-connect">Connect wallet</button>
           <span class="dim" id="wallet-note">${Wallet.available()
             ? "your wallet signs; this page never holds a key" : "no browser wallet detected"}</span>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <span class="note">Test networks only. Connect a wallet that holds nothing you would
+            miss: this rail asks for Base, Ethereum, Optimism, Arbitrum and Polygon Sepolia, and
+            no request is made until you click.</span>
         </div>`;
       el("btn-connect").addEventListener("click", () => connectWallet());
       return;
@@ -639,13 +644,10 @@
       });
       el("btn-approve").addEventListener("click", approve);
       el("btn-burn").addEventListener("click", burn);
-      if (Wallet.available()) {
-        // A wallet that is already authorised should not have to be connected twice.
-        new window.ethers.BrowserProvider(window.ethereum).listAccounts().then((accounts) => {
-          if (accounts && accounts.length) return connectWallet();
-          return null;
-        }).catch(() => {});
-      }
+      // Nothing touches the wallet until the person in front of the screen asks for it.
+      // A page that calls `eth_requestAccounts` on load - even to save a click - is
+      // indistinguishable from the pattern wallet warnings exist to catch, and a wallet
+      // that warns on a rail like this one is warning correctly.
       loadMyTransfers().catch(() => {});
     },
     track,
