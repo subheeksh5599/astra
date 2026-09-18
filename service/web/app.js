@@ -287,30 +287,16 @@ Astra = {
   },
 };
 
+/* The hero shows the control surface as it actually is - one real screenshot, taken from the
+   running instance - and keeps one live line under it, because a picture of a live system
+   should still say how live it is. */
 function renderEvidence(receipts) {
-  const host = el("evidence");
+  const caption = el("shot-caption");
+  if (!caption) return;
   const settled = receipts.filter((r) => r.transaction_link).length;
-  text(el("product-count"),
-    receipts.length ? `${receipts.length} decisions recorded, ${settled} moved value` : "no decisions recorded yet");
-  if (!receipts.length) {
-    host.innerHTML = `<p class="note">No receipts yet.</p>`;
-    return;
-  }
-  host.innerHTML = `
-    <table>
-      <thead><tr><th style="width:220px">Transfer</th><th style="width:220px">Decision</th>
-      <th>Destination transaction</th></tr></thead>
-      <tbody>
-      ${receipts.slice(0, 5).map((r) => `
-        <tr>
-          <td><span class="mono dim">${short(r.transfer_id, 12, 6)}</span></td>
-          <td><span class="tag ${r.decision && r.decision.action === "refuse" ? "no" : "ok"}">${r.decision ? r.decision.reason : "recorded"}</span></td>
-          <td>${r.transaction_link
-            ? `<a href="${r.transaction_link}" target="_blank" rel="noreferrer" class="mono">${short(r.transaction_hash, 12, 6)}</a>`
-            : `<span class="dim">no money moved</span>`}</td>
-        </tr>`).join("")}
-      </tbody>
-    </table>`;
+  text(caption, receipts.length
+    ? `${receipts.length} decisions recorded on this instance, ${settled} of them moved value.`
+    : "No decisions recorded on this instance yet.");
 }
 
 function bindTrace() {
@@ -374,6 +360,9 @@ function bindApp() {
   });
   window.addEventListener("hashchange", () => showPane(paneFromHash()));
   showPane(paneFromHash());
+  // the invariant is read in the background even when you never open its pane: the rail
+  // carries its count, and a count you have to click to see is not a count
+  setTimeout(() => loadInvariant(false), 1200);
 }
 
 /* The dashboard is one pane at a time, chosen from the rail. Everything is loaded
@@ -425,7 +414,7 @@ async function refresh() {
     renderRows(ASTRAA.rows);
     const age = body.age_seconds ? `, read ${body.age_seconds}s ago` : "";
     const span = seconds >= 86400 ? `${seconds / 86400} day` : (seconds >= 3600 ? `${seconds / 3600}h` : `${seconds}s`);
-    text(el("last-scan"), `${ASTRAA.rows.length} in flight over the last ${span}${age}`);
+    text(el("last-scan"), `the last ${span} on every chain${age}`);
   } catch (err) {
     showError(`could not read the chains: ${err.message}`);
     text(el("last-scan"), "scan failed");
@@ -433,6 +422,54 @@ async function refresh() {
   clearInterval(ticker);
   ASTRAA.busy = false;
   el("btn-refresh").disabled = false;
+}
+
+
+/* The four numbers are not four categories: deliverable, waiting and refused are the parts
+   of "in flight". Drawn as a bar so the relationship is visible without a sentence. */
+function renderStateBar(counts, total) {
+  const host = el("state-bar");
+  if (!host) return;
+  if (!total) {
+    host.innerHTML = `<span class="seg wait" style="width:100%"></span>`;
+    text(el("bar-note"), "nothing in flight in this window");
+    return;
+  }
+  const parts = [["ok", counts.complete || 0], ["wait", counts.defer || 0], ["no", counts.refuse || 0]];
+  host.innerHTML = parts
+    .filter(([, value]) => value > 0)
+    .map(([cls, value]) => `<span class="seg ${cls}" style="width:${Math.round((value / total) * 100)}%" title="${value} of ${total}"></span>`)
+    .join("");
+  text(el("bar-note"), `${total} transfer${total === 1 ? "" : "s"} in flight, read from the chains`);
+}
+
+
+/* Which chains this rail knows, by the domain number a message carries. */
+function chainName(domain) {
+  // Number(null) is 0, and 0 is a real domain: an absent destination must never resolve
+  // into a chain this rail happens to watch.
+  if (domain === null || domain === undefined || domain === "") return "not decoded";
+  const chains = (ASTRAA.config && ASTRAA.config.chains) || {};
+  const list = Array.isArray(chains) ? chains : Object.values(chains);
+  const hit = list.find((chain) => Number(chain.domain) === Number(domain));
+  if (hit) return hit.name;
+  if (domain === null || domain === undefined || Number.isNaN(Number(domain))) return "unknown chain";
+  return `domain ${domain}`;
+}
+
+/* An action is only offered when the protocol has not already ruled it out. A refusal read
+   from the destination's own state is final; a deferral is a "not yet" and may be attempted.
+   Offering a button that cannot succeed would be the opposite of what this rail is for. */
+const FINAL_REFUSALS = [
+  "ALREADY_DELIVERED", "UNSUPPORTED_DOMAIN", "DEPLOYMENT_ABSENT",
+  "MESSAGE_INCONSISTENT", "WRONG_TRANSMITTER", "RECIPIENT_MISMATCH", "ROUTE_MISMATCH",
+];
+
+function rowAction(decision) {
+  if (!decision) return "retry";
+  if (decision.action === "complete") return "finish";
+  if (FINAL_REFUSALS.includes(decision.reason)) return "none";
+  return "retry";
 }
 
 function renderRows(rows) {
@@ -446,6 +483,7 @@ function renderRows(rows) {
   text(el("c-ready"), String(counts.complete));
   text(el("c-waiting"), String(counts.defer));
   text(el("c-refused"), String(counts.refuse));
+  renderStateBar(counts, rows.length);
 
   if (!rows.length) {
     tbody.innerHTML = `<tr><td colspan="6" class="dim">Nothing in flight in this window.</td></tr>`;
@@ -453,30 +491,34 @@ function renderRows(rows) {
   }
   tbody.innerHTML = rows.map((row) => {
     const d = row.decision || {};
-    const canFinish = d.action === "complete";
+    const attempt = rowAction(d);
+    const id = String(row.transfer_id || "").replace(/^\d+:/, "");
+    const recipient = row.mint_recipient ? short(row.mint_recipient, 8, 4) : "not decoded";
+    const attestation = row.attestation_state || "not asked";
+    const action =
+      attempt === "finish"
+        ? `<button class="btn primary sm" data-burn="${row.burn_tx}" data-source="${row.source_domain}" data-destination="${row.destination_domain}">Finish it</button>`
+        : attempt === "retry"
+          ? `<button class="btn outline sm" data-burn="${row.burn_tx}" data-source="${row.source_domain}" data-destination="${row.destination_domain}">Try anyway</button>`
+          : `<span class="dim" style="font-size:12.5px">not ours to attempt</span>`;
     return `
     <tr>
       <td>
-        <span class="mono">${short(row.transfer_id, 12, 6)}</span>
+        <span class="dim" style="font-size:12.5px">${chainName(row.source_domain)}</span>
+        <div class="mono">${short(id, 12, 6)}</div>
         <div class="why">source block ${row.block}</div>
       </td>
+      <td><span class="mono">${row.amount === null || row.amount === undefined ? "\u2014" : fmtAmount(row.amount) + " USDC"}</span></td>
       <td>
-        <span class="mono">${row.amount === null || row.amount === undefined ? "\u00b7" : fmtAmount(row.amount) + " USDC"}</span>
-        <div class="why">${short(row.mint_recipient, 8, 4)}</div>
+        <span class="dim" style="font-size:12.5px">${chainName(row.destination_domain)}</span>
+        <div class="why">to ${recipient}</div>
       </td>
-      <td>
-        <span class="mono">${row.destination_name}</span>
-        <div class="why">domain ${row.destination_domain}</div>
-      </td>
-      <td><span class="mono dim">${row.attestation_state}</span></td>
+      <td><span class="mono dim">${attestation}</span></td>
       <td>
         <span class="tag ${decisionClass(d)}">${d.reason || "unknown"}</span>
         <div class="why">${d.detail || ""}</div>
       </td>
-      <td>
-        <button class="btn ${canFinish ? "primary" : "outline"} sm" data-burn="${row.burn_tx}"
-          data-source="${row.source_domain}" data-destination="${row.destination_domain}">${canFinish ? "Finish it" : "Try anyway"}</button>
-      </td>
+      <td>${action}</td>
     </tr>`;
   }).join("");
 
@@ -591,6 +633,8 @@ function renderInvariant(out) {
   (out.rows || []).forEach((row) => { counts[row.verdict] = (counts[row.verdict] || 0) + 1; });
   text(el("i-paired"), String(counts.paired || 0));
   text(el("rail-c-paired"), String(counts.paired || 0));
+  const passRows = el("inv-passes");
+  if (passRows) text(el("rail-c-passes"), String(Math.max(passRows.querySelectorAll("tr").length - 1, 0)));
   text(el("i-stranded"), String(counts.stranded || 0));
   text(el("i-inflight"), String(counts["in flight"] || 0));
   text(el("i-unwatched"), String(counts.unwatched || 0));
