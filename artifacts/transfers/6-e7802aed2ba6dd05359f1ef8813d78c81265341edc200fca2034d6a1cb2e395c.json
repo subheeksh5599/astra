@@ -1,0 +1,112 @@
+{
+  "agreement": {
+    "amount": 500000,
+    "disagreements": [],
+    "witnesses": [
+      {
+        "amount": 500000,
+        "witness": "the transaction's own calldata"
+      },
+      {
+        "amount": 500000,
+        "witness": "the TokenMessenger's own DepositForBurn event"
+      },
+      {
+        "amount": 500000,
+        "witness": "the token minter's own Burn event"
+      }
+    ]
+  },
+  "amount": 500000,
+  "amount_usdc": 0.5,
+  "attempts": [
+    {
+      "at": "2026-09-18T07:42:29Z",
+      "block": 11729312,
+      "burned": 500000,
+      "decision": {
+        "action": "complete",
+        "detail": "attestation final, message matches the request, destination accepts the delivery",
+        "reason": "READY"
+      },
+      "expected_min": 499935,
+      "fee": 65,
+      "minted": 499935,
+      "paired": true,
+      "receipt_status": "success",
+      "seconds": 20.5,
+      "transaction_hash": "0x17dc7c5b6b45b98b3c613d8d8f670bd659b650965042c8c511182eaef1abb0c4",
+      "transaction_link": "https://sepolia.etherscan.io/tx/0x17dc7c5b6b45b98b3c613d8d8f670bd659b650965042c8c511182eaef1abb0c4"
+    }
+  ],
+  "burn_token": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+  "caller": null,
+  "created_at": "2026-09-18T07:41:56Z",
+  "deployment": "v2",
+  "destination_domain": 0,
+  "destination_tx": "0x17dc7c5b6b45b98b3c613d8d8f670bd659b650965042c8c511182eaef1abb0c4",
+  "detail": "the destination's own receipt and token event agree",
+  "max_fee": 500,
+  "message": "0x000000000000000000000000000000000000000000000000000000000000017800000001000000060000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008fe6b999dc680ccfdd5bf7eb0974218be2542daa0000000000000000000000008fe6b999dc680ccfdd5bf7eb0974218be2542daa0000000000000000000000000000000000000000000000000000000000000000000003e80000000000000001000000000000000000000000036cbd53842c5426634e7929541ec2318f3dcf7e0000000000000000000000003991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad9000000000000000000000000000000000000000000000000000000000007a1200000000000000000000000003991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad900000000000000000000000000000000000000000000000000000000000001f40000000000000000000000000000000000000000000000000000000000000000",
+  "min_finality_threshold": 1000,
+  "minted": 499935,
+  "nonce": "0xa79e740360a392ac3c354b0809af29d1ffd30f05ff35faa56eadfaf66a88f534",
+  "owner": "0x3991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad9",
+  "recipient": "0x3991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad9",
+  "source_domain": 6,
+  "source_signer": "0x3991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad9",
+  "source_tx": "0xe7802aed2ba6dd05359f1ef8813d78c81265341edc200fca2034d6a1cb2e395c",
+  "state": "DELIVERED",
+  "transfer_id": "6-e7802aed2ba6dd05359f1ef8813d78c81265341edc200fca2034d6a1cb2e395c",
+  "updated_at": "2026-09-18T07:51:41Z",
+  "witnesses": {
+    "burn": {
+      "amount": 500000,
+      "amount_usdc": 0.5,
+      "burn_transfer": {
+        "amount": 500000,
+        "amount_usdc": 0.5,
+        "burn": true,
+        "from": "0xb43db544e2c27092c107639ad201b3defabcf192",
+        "to": null,
+        "witness": "the token's own Transfer event"
+      },
+      "burner": "0xb43db544e2c27092c107639ad201b3defabcf192",
+      "witness": "the token minter's own Burn event"
+    },
+    "calldata": {
+      "amount": 500000,
+      "amount_usdc": 0.5,
+      "burn_token": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+      "caller": null,
+      "destination_domain": 0,
+      "max_fee": 500,
+      "min_finality_threshold": 1000,
+      "recipient": "0x3991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad9",
+      "witness": "the transaction's own calldata"
+    },
+    "deposit_for_burn": {
+      "action": "depositForBurn",
+      "amount": 500000,
+      "amount_usdc": 0.5,
+      "burn_token": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+      "depositor": "0x3991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad9",
+      "destination_caller": null,
+      "destination_domain": 0,
+      "log": {
+        "address": "0x8fe6b999dc680ccfdd5bf7eb0974218be2542daa",
+        "block": 46974429,
+        "index": 19
+      },
+      "max_fee": 500,
+      "min_finality_threshold": 1000,
+      "mint_recipient": "0x3991d5267e013fb9d5f2fbb30b8f3d8ff97c1ad9",
+      "witness": "the TokenMessenger's own DepositForBurn event"
+    },
+    "message_sent": {
+      "bytes": 376,
+      "rail_decode": null,
+      "witness": "the transmitter's own MessageSent event"
+    }
+  }
+}

@@ -83,6 +83,23 @@ def store_dir(env: dict) -> str:
     return os.path.join(root, "artifacts", "transfers")
 
 
+def committed_dir() -> str:
+    """The transfers this repository ships, which a hosted instance can read but
+    not write. They are receipts like any other: the same shape, the same fields."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(root, "artifacts", "transfers")
+
+
+def store_dirs(env: dict) -> list:
+    """Where records are looked for: what this instance wrote, then what the
+    repository carries. A hosted instance answers with its own transfers plus the
+    ones its repository proved, and never invents a third kind."""
+    writable = store_dir(env)
+    committed = committed_dir()
+    return [writable] if os.path.abspath(writable) == os.path.abspath(committed) \
+        else [writable, committed]
+
+
 def _path(env: dict, transfer_id: str) -> str:
     safe = "".join(c for c in transfer_id if c.isalnum() or c in "-_")
     return os.path.join(store_dir(env), f"{safe}.json")
@@ -100,14 +117,17 @@ def save(env: dict, record: dict) -> str:
 
 
 def load(env: dict, transfer_id: str) -> dict | None:
-    path = _path(env, transfer_id)
-    if not os.path.exists(path):
-        return None
-    try:
-        with open(path, encoding="utf-8") as fh:
-            return json.load(fh)
-    except (OSError, ValueError):
-        return None
+    safe = "".join(c for c in transfer_id if c.isalnum() or c in "-_")
+    for folder in store_dirs(env):
+        path = os.path.join(folder, f"{safe}.json")
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(path, encoding="utf-8") as fh:
+                return json.load(fh)
+        except (OSError, ValueError):
+            continue
+    return None
 
 
 def list_records(env: dict, owner: str | None = None) -> list:
@@ -116,18 +136,20 @@ def list_records(env: dict, owner: str | None = None) -> list:
     A wallet only ever sees its own: `owner` is the address that signed the burn,
     recorded when the transfer was registered, and compared as an address.
     """
-    folder = store_dir(env)
-    if not os.path.isdir(folder):
-        return []
     out = []
-    for name in sorted(os.listdir(folder), reverse=True):
-        if not name.endswith(".json"):
+    seen = set()
+    for folder in store_dirs(env):
+        if not os.path.isdir(folder):
             continue
-        try:
-            with open(os.path.join(folder, name), encoding="utf-8") as fh:
-                record = json.load(fh)
-        except (OSError, ValueError):
-            continue
+        for name in sorted(os.listdir(folder), reverse=True):
+            if not name.endswith(".json") or name in seen:
+                continue
+            seen.add(name)
+            try:
+                with open(os.path.join(folder, name), encoding="utf-8") as fh:
+                    record = json.load(fh)
+            except (OSError, ValueError):
+                continue
         if owner and (record.get("owner") or "").lower() != owner.lower():
             continue
         out.append(record)
