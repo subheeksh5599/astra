@@ -150,9 +150,9 @@ def list_records(env: dict, owner: str | None = None) -> list:
                     record = json.load(fh)
             except (OSError, ValueError):
                 continue
-        if owner and (record.get("owner") or "").lower() != owner.lower():
-            continue
-        out.append(record)
+            if owner and (record.get("owner") or "").lower() != owner.lower():
+                continue
+            out.append(record)
     out.sort(key=lambda r: r.get("created_at") or "", reverse=True)
     return out
 
