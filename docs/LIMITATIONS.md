@@ -113,3 +113,25 @@ approximating; the codes below are the honest edges of that.
 - No hosted deployment: the surface runs where the environment runs, and the demo is that instance.
 - The tests cover the decisions, the decoding and the invariant's arithmetic. They are not a substitute
   for an audit.
+
+## The application (updated)
+
+- **The extended message layout is not fully decoded by this repository.** The v2 deployment on
+  Base Sepolia emits a 376-byte message whose field offsets do not line up with the layout this
+  project implements: a field-by-field read of a real message shows the amount, recipient and
+  token shifted, and the rail's own parse therefore fails its own sanity check and returns
+  nothing. Nothing is guessed in its place. The transfer's fields are read from the
+  TokenMessenger's `DepositForBurn` event and from the attestation service's decode of the same
+  bytes; the rail's parse is shown only when it agrees with those. Fixing the offsets is the
+  next piece of work on the decoder, and the tests pin the current behaviour so the fix is
+  visible when it lands.
+- **The wallet path is exercised up to signing.** Every step the application takes was run
+  against the live deployment — routes, prepare, allowance reads, registration, the state
+  machine, execution and the burn/mint verification — and the wallet steps (connect, approve,
+  burn, switch network) are implemented against the standards they use, but no browser wallet
+  was present in the environment they were written in. Treat the approve/burn signatures as
+  reviewed, not as run.
+- **Deliveries are still only proven on 6 → 0.** The rail watches five chains and every route in
+  `/api/config` is marked deliverable because each destination contract answers with the domain
+  it serves, but the transfers executed end to end are Base Sepolia → Ethereum Sepolia. The
+  execution layer's wallet holds gas on Ethereum Sepolia only.

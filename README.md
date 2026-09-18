@@ -159,6 +159,47 @@ decided, and what moved.
 
 ![Receipts](service/web/assets/shot-receipts.webp)
 
+## The application
+
+The control surface is a real client for this rail: it creates transfers, watches them, and
+finishes them. Nothing in the browser decides anything — the wallet signs, the chains answer, and
+the rail's own HTTP boundary makes the decisions.
+
+    connect      wallet, address, chain, gas balance, token balance, allowance — all read from
+                 the chain, with a real switch-network action when the wallet is on the wrong
+                 source chain, and a disconnect
+    route        the source and destination chains come from /api/config, never from the page
+    prepare      POST /api/transfer/prepare validates the route, the amount, the recipient and the
+                 caller, reads the allowance and both balances, and returns the exact burn the
+                 wallet must sign. A transfer the rail knows will fail is refused here, before a
+                 wallet is opened
+    approve      a real ERC-20 approval, its receipt awaited and its allowance reread from the
+                 chain; only then does the burn unlock
+    burn         the wallet broadcasts the prepared instruction; the hash is shown with its
+                 explorer link, the receipt is checked, and the message has to be in it
+    register     POST /api/transfer/register reads the source receipt and stores the transfer
+                 under its domain and transaction hash — never under a decoded identifier
+    track        GET /api/transfer/:id answers with a state, and the evidence for it:
+                 CREATED, SOURCE_PENDING, SOURCE_CONFIRMED, WAITING_FOR_FINALITY,
+                 ATTESTATION_READY, DELIVERY_READY, DELIVERY_SUBMITTED, DELIVERED, REFUSED,
+                 FAILED, STRANDED. Every one is a chain read or an attestation answer
+    execute      POST /api/transfer/:id/execute rereads everything the guards depend on, refuses
+                 if another executor already delivered it, executes through the execution layer,
+                 and reports DELIVERED only once the destination's own receipt and token event
+                 agree on the amount
+
+Four witnesses are read for every burn, separately: the wallet's own calldata, the
+TokenMessenger's `DepositForBurn`, the token minter's `Burn` event, and the transmitter's
+`MessageSent` bytes. Where two of them disagree, the disagreement is the finding.
+
+A refusal is never a button. `ALREADY_DELIVERED`, `CALLER_RESTRICTED`, `ATTESTATION_PENDING`,
+`PREFLIGHT_REVERT`, `WRONG_TRANSMITTER`, `UNSUPPORTED_DOMAIN` and `DEPLOYMENT_ABSENT` each render
+their reason and the evidence behind it, and the execution action is absent rather than disabled.
+
+**My transfers** is scoped to the connected wallet: the rail returns the transfers that wallet
+signed and nothing else, and each row opens the same evidence-first view — source, protocol,
+attestation, destination, invariant, with the pair measured rather than asserted.
+
 ## How it executes
 
 The rail holds no key and signs nothing itself. Every state-changing call goes through an execution
@@ -228,7 +269,10 @@ for each one.
     astra/payer.py           the paying side: approve, burn, and nothing else
     astra/rpc.py             a read-only JSON-RPC client
     scripts/                 the payer side, discovery, completion, the invariant, the watcher
+    astra/source.py          the four witnesses of a burn, read separately and compared
+    astra/transfers.py       prepare, register, the state machine, and guarded execution
     service/                 the HTTP surface and the browser control surface
+    service/web/transfer.js  the client: wallet, approve, burn, track, history
     api/index.py             the hosted entry point: the same surface, read-only, no key
     vercel.json              the deployment: one function for every route, 60s, bundle includes
     tests/                   68 tests, including the captured messages this project produced
