@@ -32,6 +32,16 @@ function el(id) { return document.getElementById(id); }
 
 function text(node, value) { if (node) node.textContent = value; }
 
+
+/* Anything that reaches the screen through a detail string gets its addresses shortened:
+   a full 40-byte address is not information a reader can use, and a screen full of them is
+   noise pretending to be evidence. */
+function stripAddrs(value) {
+  return String(value == null ? "" : value)
+    .replace(/0x[0-9a-fA-F]{40}/g, (a) => `${a.slice(0, 6)}\u2026${a.slice(-4)}`)
+    .replace(/0x[0-9a-fA-F]{64}/g, (a) => `${a.slice(0, 10)}\u2026${a.slice(-6)}`);
+}
+
 function short(hex, head = 10, tail = 6) {
   if (!hex) return "\u00b7";
   const s = String(hex);
@@ -239,7 +249,7 @@ Astra = {
         chip.querySelector(".dot").classList.add("on");
       }
       text(el("foot-config"),
-        `${cfg.deployment} deployment \u00b7 ${cfg.read_only ? "read-only instance" : "signs locally"}`
+        `${cfg.deployment} deployment \u00b7 burns signed by ${cfg.read_only ? "your wallet" : "this machine"}`
         + ` \u00b7 watching domains ${cfg.watched_domains.join(", ")}`);
       if (el("band")) renderBand();
     } catch (err) {
@@ -270,8 +280,8 @@ Astra = {
       el("payer-destination").innerHTML = chainOptions(
         cfg.chains["0"] ? 0 : cfg.watched_domains[cfg.watched_domains.length - 1]);
       await loadPayer();
-      text(el("cfg-line"),
-        `${cfg.deployment} deployment \u00b7 attestation via ${new URL(cfg.attestation_base).host}`);
+      // the header states what this build is, not the hostname of its dependencies
+text(el("cfg-line"), `${cfg.deployment} deployment`);
       const faucet = el("faucet");
       if (cfg.faucet) { faucet.href = cfg.faucet; faucet.classList.remove("hidden"); }
     } catch (err) {
@@ -332,7 +342,7 @@ function renderTrace(receipt) {
       <span class="tag ${decisionClass(d)}">${d.reason}</span>
       <span class="mono dim" style="font-size:13px">${receipt.transfer_id}</span>
     </div>
-    <p style="margin-bottom:14px">${d.detail || ""}</p>
+    <p style="margin-bottom:14px">${stripAddrs(d.detail)}</p>
     <dl class="kv">
       <dt>Attestation</dt><dd>${(receipt.observed || {}).attestation_state || "\u00b7"}</dd>
       <dt>Amount</dt><dd>${(receipt.observed || {}).message ? fmtAmount(receipt.observed.message.amount) + " USDC" : "\u00b7"}</dd>
@@ -351,6 +361,8 @@ function bindApp() {
   el("btn-wallet-open").addEventListener("click", openTransfer);
   el("filter-blocks").addEventListener("change", refresh);
   el("btn-invariant").addEventListener("click", () => loadInvariant(true));
+  const pass = el("btn-pass");
+  if (pass) pass.addEventListener("click", () => loadInvariant(true));
   document.querySelectorAll(".rail-item[data-pane]").forEach((item) => {
     item.addEventListener("click", (event) => {
       event.preventDefault();
@@ -516,7 +528,7 @@ function renderRows(rows) {
       <td><span class="mono dim">${attestation}</span></td>
       <td>
         <span class="tag ${decisionClass(d)}">${d.reason || "unknown"}</span>
-        <div class="why">${d.detail || ""}</div>
+        <div class="why">${stripAddrs(d.detail)}</div>
       </td>
       <td>${action}</td>
     </tr>`;
@@ -568,7 +580,7 @@ function showReceipt(receipt) {
         ? `<a href="${receipt.transaction_link}" target="_blank" rel="noreferrer" class="mono">${receipt.transaction_hash}</a>`
         : "none: no money moved"}</dd>
       <dt>Evidence</dt>
-      <dd>${d.evidence ? String(d.evidence).slice(0, 220) : "seen on chain"}</dd>
+      <dd>${d.evidence ? stripAddrs(String(d.evidence)).slice(0, 220) : "seen on chain"}</dd>
       <dt>Took</dt>
       <dd>${receipt.seconds}s</dd>
     </dl>`;
@@ -648,14 +660,27 @@ function renderInvariant(out) {
       ? `${fmtAmount(row.minted_amount)} of ${fmtAmount(row.expected_amount)} USDC`
       : (row.value_matches === false ? "short" : "\u00b7");
     const cls = row.verdict === "paired" ? "ok" : (row.verdict === "stranded" ? "no" : "wait");
+    // A verdict you cannot act on is a report. Where the read says value could move and has not,
+    // the row offers the delivery itself: the same call the transfers pane makes, same execution
+    // layer, same receipt.
+    const act = row.verdict === "stranded"
+      ? `<button class="btn primary sm" data-burn="${row.burn_tx}" data-source="${row.source_domain}" data-destination="${row.destination_domain}">Finish it</button>`
+      : (row.verdict === "in flight" && row.burn_tx
+          ? `<button class="btn outline sm" data-burn="${row.burn_tx}" data-source="${row.source_domain}" data-destination="${row.destination_domain}">Try anyway</button>`
+          : `<span class="dim" style="font-size:12.5px">\u2014</span>`);
     return `<tr>
       <td><span class="mono">${short(row.transfer_id, 14, 6)}</span></td>
       <td>${row.destination_name || "\u00b7"}</td>
       <td><span class="mono dim">${row.attestation || "\u00b7"}</span></td>
       <td><span class="tag ${cls}">${row.verdict}</span></td>
       <td class="mono">${value}</td>
+      <td>${act}</td>
     </tr>`;
-  }).join("") : `<tr><td colspan="5" class="dim">nothing in this window</td></tr>`;
+  }).join("") : `<tr><td colspan="6" class="dim">nothing in this window</td></tr>`;
+
+  tbody.querySelectorAll("button[data-burn]").forEach((button) => {
+    button.addEventListener("click", () => finish(button));
+  });
 
   const broken = out.broken || [];
   el("inv-broken").innerHTML = broken.length ? `
@@ -697,12 +722,15 @@ function renderPayer(payer) {
   if (!payer.configured) {
     const hosted = ASTRAA.config && ASTRAA.config.read_only;
     box.innerHTML = hosted
-      ? `<div class="brief">This instance holds no paying key.<br>
-           <span class="dim">It reads both chains and finishes transfers through the execution
-           layer, including yours. Creating one is signed in your own wallet, below &mdash; or run
-           the rail locally, where a key lives.</span></div>`
-      : `<div class="brief">No paying key on this machine.<br>
-           <span class="dim">${payer.detail || ""}</span></div>`;
+      ? `<dl class="kv">
+           <dt>Burn key</dt><dd>not on this instance</dd>
+           <dt>Signed by</dt><dd>your wallet</dd>
+           <dt>Finish</dt><dd>through the execution layer</dd>
+         </dl>`
+      : `<dl class="kv">
+           <dt>Burn key</dt><dd>${payer.address ? stripAddrs(payer.address) : "none"}</dd>
+           <dt>Detail</dt><dd>${stripAddrs(payer.detail || "")}</dd>
+         </dl>`;
     el("btn-open").disabled = true;
     el("btn-open-finish").disabled = true;
     return;
