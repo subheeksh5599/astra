@@ -15,6 +15,8 @@ what may not move.
 [![Invariant](https://img.shields.io/badge/invariant-executable%20%2B%20quantitative-3f9d8f?labelColor=0e1013)](scripts/prove_pairing.py)
 [![License](https://img.shields.io/badge/license-MIT-yellow?labelColor=0e1013)](LICENSE)
 
+<img src="service/web/assets/control-surface.png" width="880" alt="The control surface: five chains watched, the transfers in flight, and the decision behind each one">
+
 </div>
 
 ---
