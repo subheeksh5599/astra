@@ -14,6 +14,10 @@
     <span class="spacer"></span>
     <span class="chip"><span class="dot on"></span><span id="chip-mode">execution layer</span></span>
     <span class="note" id="cfg-line">reading configuration</span>
+    <span class="wallet-top">
+      <span class="dim" id="wallet-state">wallet not connected</span>
+      <button class="btn outline sm" id="btn-connect">Connect wallet</button>
+    </span>
     <button class="btn outline sm" id="btn-refresh">Rescan</button>
   </div>
 </header>
@@ -42,7 +46,6 @@
 
       <div class="rail-group">Payer</div>
       <a class="rail-item" href="#burn" data-pane="burn"><span class="label">Burn</span></a>
-      <a class="rail-item" href="#wallet" data-pane="wallet"><span class="label">Wallet</span></a>
 
       
     </nav>
@@ -181,6 +184,7 @@
           <div class="row">
             <button class="btn primary" id="btn-open">Burn it</button>
             <button class="btn outline" id="btn-open-finish">Burn and finish</button>
+            <button class="btn outline" id="btn-wallet-open" disabled>Approve and burn in your wallet</button>
           </div>
           <p class="note" id="open-state" style="margin-top:14px">nothing sent yet</p>
           <ol class="steps hidden" id="open-steps"></ol>
@@ -189,22 +193,6 @@
             <a class="btn outline sm hidden" id="mint-link" target="_blank" rel="noreferrer">Mint</a>
             <a class="btn outline sm hidden" id="faucet" target="_blank" rel="noreferrer">Faucet</a>
           </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="pane-body hidden" data-pane="wallet" id="wallet">
-      <div class="panel">
-        <div class="panel-head">
-          <h1>Wallet</h1>
-          <span class="note">the same burn, signed by you</span>
-        </div>
-        <div class="panel-body">
-          <div class="row" style="margin-bottom:14px">
-            <button class="btn outline" id="btn-connect">Connect wallet</button>
-            <span class="dim" id="wallet-state" style="font-size:13px">not connected</span>
-          </div>
-          <button class="btn primary" id="btn-wallet-open" disabled>Approve and burn</button>
         </div>
       </div>
     </section>
