@@ -173,6 +173,21 @@
           <span class="note">Test networks only. Connect a wallet that holds nothing you would
             miss: this rail asks for Base, Ethereum, Optimism, Arbitrum and Polygon Sepolia, and
             no request is made until you click.</span>
+        </div>
+        <details class="asks">
+          <summary>What this page will ask your wallet to do</summary>
+          <dl class="kv">
+            <dt>See your address</dt><dd>once, when you click Connect</dd>
+            <dt>Read balances</dt><dd>the rail reads them from the chains; it never signs a read</dd>
+            <dt>Approve</dt><dd>one transaction, for exactly the amount you type &mdash; never
+              unlimited</dd>
+            <dt>Burn</dt><dd>one transaction, to the messenger contract of the source chain</dd>
+            <dt>Switch network</dt><dd>only if your wallet is on another Sepolia chain than the
+              source you chose</dd>
+          </dl>
+          <p class="note">Nothing else: no other contract, no other token, and no request at all
+            before you click.</p>
+        </details>
         </div>`;
       el("btn-connect").addEventListener("click", () => connectWallet());
       return;

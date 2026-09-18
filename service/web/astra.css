@@ -725,3 +725,9 @@ td .count .tag{font-size:12px}
 #tracking-panel .panel-body .row{gap:10px}
 #my-list table{margin:0}
 #my-list tbody tr{cursor:pointer}
+
+/* what the page will ask for, said before it asks */
+.asks{margin-top:14px;border:1px solid var(--mist);border-radius:var(--r-card);padding:12px 16px;background:var(--paper)}
+.asks summary{cursor:pointer;font-size:13.5px;color:var(--ink);font-weight:500}
+.asks .kv{margin-top:12px}
+.asks .note{margin-top:10px}
